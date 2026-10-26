@@ -2,1761 +2,1166 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>MealFlow 學餐 AI 流量管制塔｜東吳大學智慧校園</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>東吳點餐 MealFlow｜校園免排隊預訂</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      /* 頂級奢華配色：曜石黑 x 皇家靛藍 x 香檳金 */
-      --obsidian: #0b0f19;
-      --obsidian-light: #161f33;
-      --accent-indigo: #4f46e5;
-      --accent-indigo-hover: #4338ca;
-      --champagne: #f59e0b;
-      --champagne-light: #fef3c7;
+      /* 餐飲點餐專屬色系：暖陽橘 x 純淨白 x 柔和灰 */
+      --brand: #FF5A1F;
+      --brand-light: #FFF3EE;
+      --brand-dark: #E04812;
+      --green: #10B981;
+      --green-bg: #ECFDF5;
+      --amber: #F59E0B;
+      --amber-bg: #FFFBEB;
+      --red: #EF4444;
+      --red-bg: #FEF2F2;
+      
+      --bg-page: #F8F9FA;
+      --bg-card: #FFFFFF;
+      --text-primary: #111827;
+      --text-secondary: #6B7280;
+      --text-muted: #9CA3AF;
+      --border: #E5E7EB;
 
-      --bg-base: #f4f5f8;
-      --card-bg: rgba(255, 255, 255, 0.95);
-      --text-main: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
-      --border-subtle: rgba(226, 232, 240, 0.88);
-
-      /* 狀態膠囊色系 */
-      --status-green-text: #047857;
-      --status-green-bg: #ecfdf5;
-      --status-green-dot: #10b981;
-
-      --status-orange-text: #b45309;
-      --status-orange-bg: #fffbeb;
-      --status-orange-dot: #f59e0b;
-
-      --status-red-text: #be123c;
-      --status-red-bg: #fff1f2;
-      --status-red-dot: #f43f5e;
-
-      --status-blue-text: #1d4ed8;
-      --status-blue-bg: #eff6ff;
-      --status-blue-dot: #3b82f6;
-
-      --radius-2xl: 26px;
       --radius-xl: 20px;
       --radius-lg: 16px;
       --radius-md: 12px;
-      --radius-sm: 8px;
-
-      --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.03);
-      --shadow-sm: 0 4px 12px -2px rgba(15, 23, 42, 0.05);
-      --shadow-card: 0 12px 32px -8px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-      --shadow-float: 0 20px 45px -10px rgba(15, 23, 42, 0.16), 0 0 1px 1px rgba(15, 23, 42, 0.04);
-      --ease-spring: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+      --shadow-float: 0 12px 32px rgba(255, 90, 31, 0.25);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; overflow-x: hidden; }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: "Inter", "Noto Sans TC", -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: var(--bg-base);
-      background-image: 
-        radial-gradient(at 10% 0%, rgba(79, 70, 229, 0.07) 0px, transparent 45%),
-        radial-gradient(at 90% 10%, rgba(245, 158, 11, 0.07) 0px, transparent 45%),
-        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
-      background-attachment: fixed;
-      color: var(--text-main);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      -webkit-font-smoothing: antialiased;
+      font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding-bottom: 90px;
     }
 
-    /* ==================== 現代奢華按鈕 ==================== */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 10px 18px;
-      border-radius: var(--radius-md);
-      font-size: 0.9rem;
-      font-weight: 700;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: var(--ease-spring);
-      text-decoration: none;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .btn:active:not(:disabled) { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.4); }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--obsidian) 0%, #1e293b 100%);
-      color: #ffffff;
-      box-shadow: 0 8px 20px -4px rgba(11, 15, 25, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    }
-    .btn-primary:hover:not(:disabled) {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-      transform: translateY(-1.5px);
-    }
-    .btn-accent {
-      background: linear-gradient(135deg, var(--accent-indigo) 0%, #3730a3 100%);
-      color: #ffffff;
-      box-shadow: 0 8px 18px -4px rgba(79, 70, 229, 0.35);
-    }
-    .btn-accent:hover:not(:disabled) {
-      background: linear-gradient(135deg, var(--accent-indigo-hover) 0%, #312e81 100%);
-      transform: translateY(-1.5px);
-    }
-    .btn-gold {
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-      color: #0b0f19;
-      font-weight: 800;
-      box-shadow: 0 8px 20px -4px rgba(245, 158, 11, 0.4);
-    }
-    .btn-gold:hover:not(:disabled) {
-      transform: translateY(-1.5px);
-      box-shadow: 0 12px 24px -4px rgba(245, 158, 11, 0.55);
-    }
-    .btn-secondary {
-      background: #ffffff;
-      color: var(--text-main);
-      border-color: #e2e8f0;
-      box-shadow: var(--shadow-xs);
-    }
-    .btn-secondary:hover:not(:disabled) {
-      background: #f8fafc;
-      border-color: #cbd5e1;
-      transform: translateY(-1px);
-    }
-    .btn-sm { padding: 7px 13px; font-size: 0.82rem; border-radius: 10px; }
-
-    /* ==================== 狀態燈號膠囊 ==================== */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 11px;
-      border-radius: 9999px;
-      font-size: 0.76rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .badge::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .badge-free { background: var(--status-green-bg); color: var(--status-green-text); }
-    .badge-free::before { background: var(--status-green-dot); }
-    .badge-mod { background: var(--status-orange-bg); color: var(--status-orange-text); }
-    .badge-mod::before { background: var(--status-orange-dot); }
-    .badge-full { background: var(--status-red-bg); color: var(--status-red-text); }
-    .badge-full::before { background: var(--status-red-dot); }
-    .badge-blue { background: var(--status-blue-bg); color: var(--status-blue-text); }
-    .badge-blue::before { background: var(--status-blue-dot); }
-    .badge-gold {
-      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-      color: #92400e;
-      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.35);
-    }
-    .badge-gold::before { background: #d97706; }
-
-    /* ==================== 頂部懸浮毛玻璃導覽島 ==================== */
-    .navbar-wrapper {
+    /* ==================== 頂部極簡導覽列 ==================== */
+    .app-header {
+      background: var(--bg-card);
       position: sticky;
-      top: 10px;
+      top: 0;
       z-index: 100;
-      padding: 0 14px;
-      margin-bottom: 8px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
     }
-    .navbar {
-      max-width: 1220px;
+    .header-inner {
+      max-width: 720px;
       margin: 0 auto;
-      background: rgba(255, 255, 255, 0.88);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.95);
-      border-radius: 9999px;
-      padding: 6px 12px 6px 16px;
-      height: 62px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .campus-switcher {
+      display: inline-flex;
+      background: var(--bg-page);
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .campus-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .campus-btn.active {
+      background: var(--brand);
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(255, 90, 31, 0.3);
+    }
+    .sync-status {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ==================== 主容器 ==================== */
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 16px 20px;
+    }
+    .view-section { display: none; }
+    .view-section.active { display: block; animation: fadeIn 0.2s ease; }
+
+    /* ==================== AI 免排隊推薦橫幅（清爽型） ==================== */
+    .smart-tip-card {
+      background: linear-gradient(135deg, #FFF3EE 0%, #FFFBEB 100%);
+      border: 1.5px solid #FED7AA;
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      margin-bottom: 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+      gap: 14px;
+      flex-wrap: wrap;
     }
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 1.05rem;
-      font-weight: 900;
-      color: var(--obsidian);
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .nav-brand .brand-icon {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: var(--obsidian);
-      color: var(--champagne);
+    .smart-tip-badge {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      box-shadow: 0 4px 12px rgba(11, 15, 25, 0.25);
-    }
-    .nav-menu {
-      display: flex;
-      align-items: center;
       gap: 4px;
-      list-style: none;
-      background: rgba(241, 245, 249, 0.85);
-      padding: 4px;
-      border-radius: 9999px;
+      background: var(--brand);
+      color: #FFFFFF;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 6px;
     }
-    .nav-item {
-      padding: 7px 16px;
-      border-radius: 9999px;
+    .smart-tip-title {
+      font-size: 0.98rem;
+      font-weight: 800;
+      color: #9A3412;
+      margin-bottom: 2px;
+    }
+    .smart-tip-desc {
+      font-size: 0.84rem;
+      color: #C2410C;
+    }
+    .btn-tip-action {
+      background: var(--brand);
+      color: #FFFFFF;
+      border: none;
+      padding: 10px 16px;
+      border-radius: var(--radius-md);
       font-size: 0.86rem;
       font-weight: 700;
       cursor: pointer;
-      color: var(--text-secondary);
-      transition: var(--ease-spring);
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(255, 90, 31, 0.25);
+    }
+
+    /* ==================== 分類快篩膠囊 ==================== */
+    .filter-row {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      user-select: none;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      margin-bottom: 8px;
+      scrollbar-width: none;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      padding: 7px 15px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
       white-space: nowrap;
     }
-    .nav-item:hover { color: var(--obsidian); }
-    .nav-item.active {
-      background: var(--obsidian);
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(11, 15, 25, 0.22);
-    }
-    .nav-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .bg-sync-pill {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 11px;
-      border-radius: 9999px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      font-size: 0.75rem;
-      font-weight: 700;
-      border: 1px solid #bfdbfe;
-    }
-    .bg-sync-pill.active { display: inline-flex; }
-    .bg-sync-spinner {
-      width: 11px;
-      height: 11px;
-      border: 2px solid #93c5fd;
-      border-top-color: #1d4ed8;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
+    .filter-chip.active {
+      background: var(--text-primary);
+      color: #FFFFFF;
+      border-color: var(--text-primary);
     }
 
-    /* ==================== 主容器與卡片 ==================== */
-    .main-content {
-      flex: 1;
-      max-width: 1220px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 12px 16px 80px;
-    }
-    .page-section { display: none; }
-    .page-section.active {
-      display: block;
-      animation: fadeIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .card {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border-radius: var(--radius-xl);
-      padding: 24px 26px;
-      box-shadow: var(--shadow-card);
-      border: 1px solid rgba(255, 255, 255, 0.9);
-      margin-bottom: 20px;
-    }
-    .card-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .card-title {
-      font-size: 1.18rem;
-      font-weight: 800;
-      color: var(--obsidian);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card-desc {
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-      margin-top: 3px;
-    }
-
-    /* ==================== 1. 學生端：曜石黑 AI 流量管制橫幅 ==================== */
-    .hero-banner {
-      background: radial-gradient(circle at 85% 20%, #1e293b 0%, var(--obsidian) 70%);
-      color: #ffffff;
-      border-radius: var(--radius-2xl);
-      padding: 28px 32px;
-      margin-bottom: 20px;
-      box-shadow: 0 20px 40px -15px rgba(11, 15, 25, 0.35);
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .hero-banner::before {
-      content: '';
-      position: absolute;
-      width: 340px;
-      height: 340px;
-      background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, transparent 70%);
-      top: -140px;
-      right: -60px;
-      pointer-events: none;
-    }
-    .hero-top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .campus-pill-group {
-      display: inline-flex;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 4px;
-      border-radius: 9999px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-    }
-    .campus-pill {
-      padding: 6px 16px;
-      border-radius: 9999px;
-      font-size: 0.84rem;
-      font-weight: 700;
-      color: #cbd5e1;
-      cursor: pointer;
-      transition: var(--ease-spring);
-      border: none;
-      background: transparent;
-    }
-    .campus-pill.active {
-      background: var(--champagne);
-      color: var(--obsidian);
-      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
-    }
-
-    /* AI 動態分流智慧攔截卡 */
-    .ai-diversion-card {
-      background: linear-gradient(135deg, rgba(79, 70, 229, 0.25) 0%, rgba(245, 158, 11, 0.18) 100%);
-      border: 1.5px solid rgba(245, 158, 11, 0.5);
-      border-radius: var(--radius-xl);
-      padding: 20px 22px;
-      margin-top: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-      flex-wrap: wrap;
-      backdrop-filter: blur(12px);
-    }
-    .ai-diversion-left {
-      flex: 1;
-      min-width: 260px;
-    }
-    .ai-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--champagne);
-      color: var(--obsidian);
-      font-size: 0.74rem;
-      font-weight: 900;
-      padding: 3px 10px;
-      border-radius: 9999px;
-      margin-bottom: 8px;
-      letter-spacing: 0.4px;
-    }
-    .ai-diversion-title {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #ffffff;
-      margin-bottom: 6px;
-    }
-    .ai-diversion-desc {
-      font-size: 0.88rem;
-      color: #e2e8f0;
-      line-height: 1.55;
-    }
-
-    /* ==================== 餐廳流量矩陣卡片 ==================== */
-    .store-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 18px;
-      margin-bottom: 24px;
-    }
-    .store-card {
-      background: #ffffff;
-      border-radius: var(--radius-xl);
-      padding: 22px;
-      border: 1.5px solid #e2e8f0;
-      box-shadow: var(--shadow-sm);
-      transition: var(--ease-spring);
+    /* ==================== 餐廳列表卡片 ==================== */
+    .store-list {
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-      overflow: hidden;
-    }
-    .store-card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-float);
-      border-color: #cbd5e1;
-    }
-    .store-card.recommended-highlight {
-      border: 2px solid var(--champagne);
-      box-shadow: 0 14px 32px -8px rgba(245, 158, 11, 0.22);
-    }
-    .store-promo-ribbon {
-      background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
-      color: #92400e;
-      font-size: 0.78rem;
-      font-weight: 800;
-      padding: 6px 12px;
-      border-radius: 10px;
-      margin: 12px 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid rgba(245, 158, 11, 0.35);
-    }
-    .load-bar-track {
-      width: 100%;
-      height: 8px;
-      background: #f1f5f9;
-      border-radius: 999px;
-      overflow: hidden;
-      margin: 8px 0 6px;
-    }
-    .load-bar-fill {
-      height: 100%;
-      border-radius: 999px;
-      transition: width 0.4s ease;
-    }
-    .store-metrics-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      font-weight: 600;
-      margin-bottom: 14px;
-    }
-
-    /* ==================== KPI 統計磚 ==================== */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 14px;
-      margin-bottom: 20px;
     }
-    .stat-card {
-      background: #ffffff;
+    .store-card {
+      background: var(--bg-card);
       border-radius: var(--radius-lg);
-      padding: 18px;
-      border: 1px solid #eef2f6;
+      padding: 16px;
+      border: 1px solid var(--border);
       box-shadow: var(--shadow-sm);
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 16px;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
-    .stat-icon {
-      width: 48px;
-      height: 48px;
+    .store-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .store-thumb {
+      width: 76px;
+      height: 76px;
       border-radius: 14px;
-      background: #f1f5f9;
-      color: var(--obsidian);
+      background: var(--brand-light);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.4rem;
+      font-size: 2.2rem;
       flex-shrink: 0;
     }
-    .stat-value {
-      font-size: 1.4rem;
-      font-weight: 900;
-      color: var(--obsidian);
-      letter-spacing: -0.5px;
+    .store-info { flex: 1; min-width: 0; }
+    .store-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
     }
-    .stat-label {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      font-weight: 600;
-    }
-
-    /* ==================== 店家後台：三種分流促銷模式選擇器 ==================== */
-    .promo-selector-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin: 14px 0 18px;
-    }
-    .promo-option-card {
-      border: 2px solid #e2e8f0;
-      border-radius: var(--radius-lg);
-      padding: 16px;
-      cursor: pointer;
-      background: #f8fafc;
-      transition: var(--ease-spring);
-      position: relative;
-    }
-    .promo-option-card:hover {
-      background: #ffffff;
-      border-color: #94a3b8;
-    }
-    .promo-option-card.selected {
-      background: #ffffff;
-      border-color: var(--obsidian);
-      box-shadow: 0 10px 24px -6px rgba(11, 15, 25, 0.14);
-    }
-    .promo-option-card.selected::after {
-      content: '✓ 已啟用';
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: var(--obsidian);
-      color: var(--champagne);
-      font-size: 0.7rem;
+    .store-name {
+      font-size: 1.08rem;
       font-weight: 800;
-      padding: 2px 8px;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .wait-pill {
+      padding: 4px 10px;
       border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .wait-free { background: var(--green-bg); color: var(--green); }
+    .wait-mod { background: var(--amber-bg); color: var(--amber); }
+    .wait-full { background: var(--red-bg); color: var(--red); }
+
+    .store-meta {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .promo-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--brand-light);
+      color: var(--brand-dark);
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 6px;
     }
 
-    /* ==================== 點餐 Modal 與表單控制項 ==================== */
-    .modal-overlay {
+    /* ==================== 點餐抽屜 (Menu Modal) ==================== */
+    .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(11, 15, 25, 0.62);
-      backdrop-filter: blur(8px);
+      background: rgba(17, 24, 39, 0.5);
+      z-index: 200;
       display: none;
-      align-items: center;
+      align-items: flex-end;
       justify-content: center;
-      z-index: 1000;
-      padding: 14px;
     }
-    .modal-overlay.open {
-      display: flex;
-      animation: fadeIn 0.2s ease;
-    }
-    .modal-card {
-      background: #ffffff;
-      border-radius: var(--radius-2xl);
+    .modal-backdrop.open { display: flex; animation: fadeIn 0.2s ease; }
+    .menu-sheet {
+      background: var(--bg-card);
       width: 100%;
-      max-width: 580px;
-      box-shadow: var(--shadow-float);
-      overflow: hidden;
+      max-width: 720px;
+      border-radius: 24px 24px 0 0;
       max-height: 90vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .modal-header {
-      padding: 18px 24px;
-      background: var(--obsidian);
-      color: #ffffff;
+    .sheet-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .modal-close {
-      background: rgba(255, 255, 255, 0.12);
-      border: none;
-      color: #ffffff;
+    .sheet-close {
       width: 34px;
       height: 34px;
       border-radius: 50%;
-      cursor: pointer;
+      border: none;
+      background: var(--bg-page);
       font-size: 1rem;
+      cursor: pointer;
     }
-    .modal-body {
-      padding: 20px 24px;
+    .sheet-body {
+      padding: 18px 20px;
       overflow-y: auto;
       flex: 1;
     }
-    .modal-footer {
-      padding: 16px 24px;
-      background: #f8fafc;
-      border-top: 1px solid #e2e8f0;
+    .menu-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
     }
-    .menu-item-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 14px;
-      border: 1px solid #e2e8f0;
-      border-radius: var(--radius-md);
-      margin-bottom: 10px;
-      background: #ffffff;
-    }
-    .qty-control {
+    .menu-item:last-child { border-bottom: none; }
+    .item-title { font-size: 0.98rem; font-weight: 700; margin-bottom: 2px; }
+    .item-price { font-size: 0.92rem; font-weight: 800; color: var(--brand); }
+    .qty-stepper {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      background: #f1f5f9;
+      gap: 12px;
+      background: var(--bg-page);
       padding: 4px 8px;
-      border-radius: 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
     }
-    .qty-btn {
+    .step-btn {
       width: 28px;
       height: 28px;
-      border-radius: 8px;
+      border-radius: 50%;
       border: none;
-      background: #ffffff;
+      background: var(--bg-card);
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--text-primary);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+    .step-btn.plus { background: var(--brand); color: #FFFFFF; }
+
+    .checkout-options {
+      background: var(--bg-page);
+      padding: 14px;
+      border-radius: var(--radius-md);
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+      display: block;
+    }
+    .select-input {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+    .sheet-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-card);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    .btn-submit-order {
+      flex: 1;
+      background: var(--brand);
+      color: #FFFFFF;
+      border: none;
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      font-size: 0.98rem;
       font-weight: 800;
       cursor: pointer;
-      box-shadow: var(--shadow-xs);
-    }
-    .form-control {
-      width: 100%;
-      padding: 10px 14px;
-      border: 1.5px solid #e2e8f0;
-      border-radius: var(--radius-md);
-      font-size: 0.92rem;
-      font-family: inherit;
-      background: #f8fafc;
-      outline: none;
-    }
-    .form-control:focus {
-      background: #ffffff;
-      border-color: var(--obsidian);
+      box-shadow: var(--shadow-float);
     }
 
-    /* 表格設計 */
-    .table-container {
-      width: 100%;
-      overflow-x: auto;
+    /* ==================== 取餐號碼牌卡片 ==================== */
+    .ticket-card {
+      background: var(--bg-card);
       border-radius: var(--radius-lg);
-      border: 1px solid #eef2f6;
-      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 20px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
     }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.86rem; }
-    th {
-      background: #f8fafc;
-      color: #64748b;
-      padding: 12px 16px;
-      font-weight: 700;
-      font-size: 0.78rem;
-      border-bottom: 1px solid #e2e8f0;
-      white-space: nowrap;
+    .ticket-number-box {
+      background: var(--brand-light);
+      color: var(--brand);
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      text-align: center;
+      min-width: 92px;
     }
-    td {
-      padding: 14px 16px;
-      border-bottom: 1px solid #f1f5f9;
-      vertical-align: middle;
-      white-space: nowrap;
+    .ticket-number-box .num {
+      font-size: 1.65rem;
+      font-weight: 900;
+      line-height: 1.1;
     }
 
-    /* Toast 通知 */
-    .toast-container {
+    /* ==================== 店家接單模式 (乾淨實用版) ==================== */
+    .merchant-box {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .promo-pills {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .promo-pill-btn {
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-page);
+      text-align: left;
+      cursor: pointer;
+    }
+    .promo-pill-btn.active {
+      border-color: var(--brand);
+      background: var(--brand-light);
+    }
+
+    /* ==================== 底部 App 導覽列 ==================== */
+    .bottom-nav {
       position: fixed;
-      top: 18px;
-      right: 16px;
-      z-index: 9999;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      z-index: 150;
+      padding: 8px 16px 12px;
+    }
+    .bottom-nav-inner {
+      max-width: 500px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      pointer-events: none;
-    }
-    .toast {
-      padding: 12px 18px;
-      border-radius: 14px;
-      background: var(--obsidian);
-      color: #ffffff;
-      font-weight: 600;
-      font-size: 0.88rem;
-      box-shadow: var(--shadow-float);
-      display: flex;
       align-items: center;
-      gap: 10px;
-      pointer-events: auto;
-      border-left: 4px solid var(--champagne);
-      animation: fadeIn 0.25s ease;
+      gap: 3px;
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .tab-btn .icon { font-size: 1.25rem; }
+    .tab-btn.active { color: var(--brand); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111827;
+      color: #FFFFFF;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      z-index: 999;
+      box-shadow: var(--shadow-md);
+      display: none;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    @media (max-width: 768px) {
-      .navbar { height: auto; padding: 10px 14px; border-radius: 20px; flex-wrap: wrap; }
-      .nav-menu { width: 100%; justify-content: space-around; order: 3; margin-top: 6px; }
-      .hero-banner { padding: 22px 18px; }
-      .store-grid { grid-template-columns: 1fr; }
-    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
   </style>
 </head>
 <body>
 
-  <!-- Toast 通知容器 -->
-  <div id="toastContainer" class="toast-container"></div>
+  <div id="toast" class="toast"></div>
 
-  <!-- 頂部懸浮毛玻璃導覽列 -->
-  <div class="navbar-wrapper">
-    <header class="navbar">
-      <div class="nav-brand" onclick="switchTab('tabStudent')">
-        <span class="brand-icon">⚡</span>
-        <div>
-          <div style="line-height: 1.1;">MealFlow AI</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary); font-weight: 600;">東吳學餐智慧流量管制塔</div>
-        </div>
+  <!-- 頂部導覽列 -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:1.35rem;">🍱</span>
+        <span style="font-weight:900; font-size:1.1rem; letter-spacing:-0.3px;">東吳學餐快點</span>
       </div>
 
-      <ul class="nav-menu">
-        <li class="nav-item active" id="nav-tabStudent" onclick="switchTab('tabStudent')">🍱 學生智慧點餐</li>
-        <li class="nav-item" id="nav-tabOrders" onclick="switchTab('tabOrders')">🎟️ 我的取餐號 <span id="myOrderCountBadge" style="background:var(--champagne); color:var(--obsidian); border-radius:99px; padding:1px 7px; font-size:0.72rem;">0</span></li>
-        <li class="nav-item" id="nav-tabMerchant" onclick="switchTab('tabMerchant')">🏪 店家 AI 管制後台</li>
-        <li class="nav-item" id="nav-tabAnalytics" onclick="switchTab('tabAnalytics')">📈 校級流量監控中心</li>
-      </ul>
-
-      <div class="nav-right">
-        <div id="bgSyncIndicator" class="bg-sync-pill">
-          <span class="bg-sync-spinner"></span>
-          <span>雲端同步中</span>
-        </div>
-        <button class="btn btn-secondary btn-sm" onclick="triggerTrafficSim('PEAK')" title="一鍵向評審展示中午大塞車與 AI 動態分流">🔥 模擬尖峰塞車</button>
+      <div class="campus-switcher">
+        <button class="campus-btn active" id="btnCampus-雙溪校區" onclick="switchCampus('雙溪校區')">雙溪校區</button>
+        <button class="campus-btn" id="btnCampus-城中校區" onclick="switchCampus('城中校區')">城中校區</button>
       </div>
-    </header>
-  </div>
+    </div>
+  </header>
 
-  <!-- 主內容區 -->
-  <main class="main-content">
+  <main class="container">
 
-    <!-- ==================== 1. 學生智慧點餐端 ==================== -->
-    <section id="tabStudent" class="page-section active">
-      <div class="hero-banner">
-        <div class="hero-top-bar">
-          <div class="campus-pill-group">
-            <button class="campus-pill active" id="campusBtn-雙溪校區" onclick="selectCampus('雙溪校區')">📍 雙溪校區（綜合大樓）</button>
-            <button class="campus-pill" id="campusBtn-城中校區" onclick="selectCampus('城中校區')">📍 城中校區（地餐/六大樓）</button>
-          </div>
-          <div style="font-size: 0.82rem; color: #cbd5e1; font-weight: 600;">
-            👤 楊定豊 (經濟系) ・ 🪙 分流積分：<strong style="color:var(--champagne);" id="userPointsDisplay">120 pts</strong>
-          </div>
-        </div>
+    <!-- ==================== 頁籤 1：探索點餐 ==================== -->
+    <section id="viewOrder" class="view-section active">
+      
+      <!-- 清爽型 AI 免排隊推薦卡 -->
+      <div id="aiSmartTipBox"></div>
 
-        <h1 style="font-size: 1.65rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 4px;">
-          別把午休浪費在排隊上，讓 AI 為你精準導流
-        </h1>
-        <p style="font-size: 0.9rem; color: #94a3b8;">
-          即時監測各櫃位出餐負載，主動攔截超載排隊並媒合閒置產能專屬優惠
-        </p>
-
-        <!-- AI 動態分流攔截橫幅（由演算法動態渲染） -->
-        <div id="aiDiversionBannerContainer"></div>
+      <!-- 快篩標籤 -->
+      <div class="filter-row">
+        <button class="filter-chip active" id="filter-ALL" onclick="setFilter('ALL')">全部店家</button>
+        <button class="filter-chip" id="filter-FAST" onclick="setFilter('FAST')">⚡ 免排隊快取 (&le;6分鐘)</button>
+        <button class="filter-chip" id="filter-PROMO" onclick="setFilter('PROMO')">🎁 分流送優惠</button>
       </div>
 
-      <!-- 餐廳即時負載卡片區 -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
-        <h2 style="font-size: 1.2rem; font-weight: 800; color: var(--obsidian);" id="storeSectionHeading">
-          雙溪校區 — 學餐即時產能與候餐預測
-        </h2>
-        <div style="display: flex; gap: 8px; align-items: center; font-size: 0.8rem; color: var(--text-secondary);">
-          <span class="badge badge-free">空閒 (&lt;50%)</span>
-          <span class="badge badge-mod">適中 (50-84%)</span>
-          <span class="badge badge-full">超載保護 (&ge;85%)</span>
-        </div>
-      </div>
-
-      <div id="studentStoreGrid" class="store-grid"></div>
+      <!-- 餐廳列表 -->
+      <div id="storeListContainer" class="store-list"></div>
     </section>
 
-    <!-- ==================== 2. 我的取餐號與訂單追蹤 ==================== -->
-    <section id="tabOrders" class="page-section">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">🎟️ 數位取餐憑證與即時進度</h2>
-            <div class="card-desc">到店免排隊，直接憑「數位取餐號」至專屬快速通道領取餐點</div>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="syncWithCloud(true)">🔄 刷新狀態</button>
-        </div>
-        <div id="studentOrdersContainer"></div>
+    <!-- ==================== 頁籤 2：我的取餐單 ==================== -->
+    <section id="viewTickets" class="view-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:1.2rem; font-weight:800;">我的取餐號碼牌</h2>
+        <button class="filter-chip" onclick="syncCloud()">🔄 重新整理</button>
       </div>
+      <div id="ticketsContainer"></div>
     </section>
 
-    <!-- ==================== 3. 店家 AI 管制與免觸控出單後台 ==================== -->
-    <section id="tabMerchant" class="page-section">
-      <div class="card" style="background: var(--obsidian); color: #ffffff; border: none;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <!-- ==================== 頁籤 3：店家接單與分流設定 ==================== -->
+    <section id="viewMerchant" class="view-section">
+      <div class="merchant-box" style="background:#FFF3EE; border-color:#FED7AA;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <div>
-            <div style="font-size: 0.78rem; color: var(--champagne); font-weight: 800; letter-spacing: 0.5px;">MERCHANT AI CONTROL CENTER</div>
-            <h2 style="font-size: 1.4rem; font-weight: 900; margin-top: 2px;">店家智慧產能防禦與免觸控語音後台</h2>
-            <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 2px;">解決「你訂」痛點：產能滿載自動防禦、離峰開啟分流優惠變現、廚房語音自動播報免滑平板</p>
+            <div style="font-size:0.76rem; font-weight:800; color:var(--brand);">店家簡易接單後台</div>
+            <h2 style="font-size:1.15rem; font-weight:800;">離峰開啟優惠吸客・語音自動讀單</h2>
           </div>
-          <div style="min-width: 240px;">
-            <label style="font-size: 0.78rem; color: #cbd5e1; font-weight: 700; display: block; margin-bottom: 4px;">切換管理店家：</label>
-            <select id="merchantStoreSelect" class="form-control" style="background: #1e293b; color: #ffffff; border-color: #334155; font-weight: 700;" onchange="renderMerchantDashboard()"></select>
-          </div>
+          <select id="merchantSelect" class="select-input" style="width:auto;" onchange="renderMerchantView()"></select>
         </div>
       </div>
 
-      <!-- 店家 4 大 AI 指標 -->
-      <div class="dashboard-grid">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #eff6ff; color: #1d4ed8;">🤖</div>
-          <div>
-            <div class="stat-value" id="merchStatPredicted">165 份</div>
-            <div class="stat-label">AI 今日備餐量預測 (晴天/考週)</div>
-          </div>
+      <!-- 店家 3 秒切換分流優惠 -->
+      <div class="merchant-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <h3 style="font-size:0.98rem; font-weight:800;">🎁 當隔壁塞車時，本店提供的分流優惠：</h3>
+          <span style="font-size:0.78rem; color:var(--text-secondary);" id="merchPredictLabel">今日預估：165 份</span>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #fffbeb; color: #b45309;">🔥</div>
-          <div>
-            <div class="stat-value" id="merchStatActive">4 單</div>
-            <div class="stat-label">目前15分鐘內待出餐單數</div>
-          </div>
+
+        <div class="promo-pills">
+          <button class="promo-pill-btn" id="pBtn-none" onclick="setMerchantPromo('none')">
+            <div style="font-weight:800; font-size:0.88rem;">⏸️ 暫不提供優惠</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">現場忙碌時關閉</div>
+          </button>
+          <button class="promo-pill-btn" id="pBtn-gift" onclick="setMerchantPromo('gift')">
+            <div style="font-weight:800; font-size:0.88rem; color:var(--brand);">🎁 免費送附餐/紅茶</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">低成本高吸引力</div>
+          </button>
+          <button class="promo-pill-btn" id="pBtn-discount" onclick="setMerchantPromo('discount')">
+            <div style="font-weight:800; font-size:0.88rem; color:var(--green);">💰 每單現折 $10 元</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">直接折現吸引學生</div>
+          </button>
+          <button class="promo-pill-btn" id="pBtn-points" onclick="setMerchantPromo('points')">
+            <div style="font-weight:800; font-size:0.88rem; color:var(--amber);">🪙 贈送雙倍點數</div>
+            <div style="font-size:0.75rem; color:var(--text-secondary);">不折損店內利潤</div>
+          </button>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #ecfdf5; color: #047857;">⚡</div>
-          <div>
-            <div class="stat-value" id="merchStatLoad">20%</div>
-            <div class="stat-label">廚房即時產能負載率</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #fef3c7; color: #92400e;">🔊</div>
-          <div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <button class="btn btn-gold btn-sm" onclick="testVoiceBroadcast()">🔊 測試廚房語音播報</button>
-            </div>
-            <div class="stat-label" style="margin-top: 6px;">免觸控語音自動讀單引擎</div>
-          </div>
+
+        <div style="display:flex; gap:10px; margin-top:10px;">
+          <input type="text" id="merchCustomText" class="select-input" style="flex:1;" placeholder="優惠顯示文字">
+          <button class="btn-tip-action" onclick="saveMerchantPromo()">儲存設定</button>
         </div>
       </div>
 
-      <!-- 商業模式核心：三種彈性分流促銷模組 -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h3 class="card-title">🎯 閒置產能變現：AI 動態分流誘因設定（店家三選一）</h3>
-            <div class="card-desc">當鄰近熱門餐廳排隊超載（&ge;85%）時，系統將自動向學生推播本店優惠，將排隊人流轉化為您的實際營收</div>
-          </div>
-          <button class="btn btn-primary" onclick="saveMerchantSettings()">💾 儲存並同步雲端</button>
+      <!-- 店家目前待製作訂單 -->
+      <div class="merchant-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="font-size:0.98rem; font-weight:800;">📋 即時訂單與語音出單</h3>
+          <button class="filter-chip" onclick="speakSample()">🔊 測試廚房語音播報</button>
         </div>
-
-        <div class="promo-selector-grid">
-          <div class="promo-option-card" id="promoCard-none" onclick="selectMerchantPromo('none')">
-            <div style="font-size: 1.2rem; margin-bottom: 6px;">⏸️ 關閉分流導客</div>
-            <div style="font-weight: 800; color: var(--obsidian); margin-bottom: 4px;">維持原價・不參與分流</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">適合目前現場人力吃緊或備料不足時使用。</div>
-          </div>
-
-          <div class="promo-option-card" id="promoCard-gift" onclick="selectMerchantPromo('gift')">
-            <div style="font-size: 1.2rem; margin-bottom: 6px;">🎁 低邊際成本附餐模式</div>
-            <div style="font-weight: 800; color: var(--obsidian); margin-bottom: 4px;">免費送紅茶 / 溫泉蛋 / 加飯</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">店家實際成本極低（約 $3~$5），但對學生具備極高感知價值，不破壞定價行情！</div>
-          </div>
-
-          <div class="promo-option-card" id="promoCard-discount" onclick="selectMerchantPromo('discount')">
-            <div style="font-size: 1.2rem; margin-bottom: 6px;">💰 離峰動態定價模式</div>
-            <div style="font-weight: 800; color: var(--obsidian); margin-bottom: 4px;">分流客每單現折 $10 元</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">直接以現金折抵吸引價格敏感型學生，將離峰閒置產能快速變現。</div>
-          </div>
-
-          <div class="promo-option-card" id="promoCard-points" onclick="selectMerchantPromo('points')">
-            <div style="font-size: 1.2rem; margin-bottom: 6px;">🪙 平台紅利點數模式</div>
-            <div style="font-weight: 800; color: var(--obsidian); margin-bottom: 4px;">贈送雙倍 MealPoints 積分</div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">店家完全不折讓利潤，由平台與校方合作透過遊戲化點數吸引學生分流。</div>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; background: #f8fafc; padding: 16px; border-radius: var(--radius-md); border: 1px solid #e2e8f0;">
-          <div>
-            <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">自訂推播優惠文案：</label>
-            <input type="text" id="merchPromoTextInput" class="form-control" placeholder="例如：🎁 AI分流招待：免費招牌冰紅茶">
-          </div>
-          <div>
-            <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">每15分鐘最大出餐產能上限 (超過自動啟動防禦)：</label>
-            <input type="number" id="merchMaxCapInput" class="form-control" min="5" max="60" value="20">
-          </div>
-          <div>
-            <label style="font-size: 0.84rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">目前現場積壓單數 (可手動微調測試負載)：</label>
-            <input type="number" id="merchActiveOrdersInput" class="form-control" min="0" max="50" value="4">
-          </div>
-        </div>
-      </div>
-
-      <!-- 店家即時接單與語音出單佇列 -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h3 class="card-title">📋 廚房即時接單佇列（支援一鍵叫號與語音播報）</h3>
-            <div class="card-desc">透過 AI 標記「分流導客訂單」，清楚看見系統為店家額外帶來的營收貢獻</div>
-          </div>
-        </div>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>取餐號</th>
-                <th>點餐學生</th>
-                <th>餐點明細</th>
-                <th>套用分流優惠</th>
-                <th>實收金額</th>
-                <th>取餐時段</th>
-                <th>狀態</th>
-                <th>廚房操作</th>
-              </tr>
-            </thead>
-            <tbody id="merchantOrdersTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== 4. 校級流量監控中心 (評審展示專區) ==================== -->
-    <section id="tabAnalytics" class="page-section">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">📈 東吳學餐 AI 流量管制成效儀表板 (評審實測專區)</h2>
-            <div class="card-desc">量化呈現「動態分流演算法」對縮短學生排隊時間、保護熱門店家產能與提升閒置店家營收之具體效益</div>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-gold btn-sm" onclick="triggerTrafficSim('PEAK')">🔥 模擬 12:10 尖峰爆滿</button>
-            <button class="btn btn-secondary btn-sm" onclick="triggerTrafficSim('NORMAL')">✅ 模擬離峰順暢</button>
-          </div>
-        </div>
-
-        <div class="dashboard-grid">
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#ecfdf5; color:#047857;">⏱️</div>
-            <div>
-              <div class="stat-value">14.2 分鐘</div>
-              <div class="stat-label">平均為每位學生節省候餐時間</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#eff6ff; color:#1d4ed8;">🔀</div>
-            <div>
-              <div class="stat-value">34.8%</div>
-              <div class="stat-label">尖峰超載訂單成功分流轉換率</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#fef3c7; color:#92400e;">💰</div>
-            <div>
-              <div class="stat-value">+26.5%</div>
-              <div class="stat-label">合作閒置店家午間營收成長</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#fff1f2; color:#be123c;">🛡️</div>
-            <div>
-              <div class="stat-value">0 棄單</div>
-              <div class="stat-label">店家因產能崩潰被迫關機次數</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>校區</th>
-                <th>學餐櫃位名稱</th>
-                <th>15分鐘產能上限</th>
-                <th>目前積壓單數</th>
-                <th>即時負載率</th>
-                <th>預估等候</th>
-                <th>AI 分流促銷策略</th>
-                <th>今日 AI 預測總量</th>
-              </tr>
-            </thead>
-            <tbody id="analyticsStoreTableBody"></tbody>
-          </table>
-        </div>
+        <div id="merchantOrderList"></div>
       </div>
     </section>
 
   </main>
 
-  <!-- ==================== 點餐與結帳 Modal ==================== -->
-  <div id="orderModal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
+  <!-- ==================== 菜單點餐抽屜 Modal ==================== -->
+  <div id="menuModal" class="modal-backdrop" onclick="if(event.target===this) closeMenuModal()">
+    <div class="menu-sheet">
+      <div class="sheet-header">
         <div>
-          <div style="font-size: 0.76rem; color: var(--champagne); font-weight: 800;" id="modalStoreCampus">雙溪校區</div>
-          <h3 style="font-size: 1.2rem; font-weight: 900;" id="modalStoreTitle">店家名稱</h3>
+          <h3 style="font-size:1.15rem; font-weight:800;" id="sheetStoreName">店家名稱</h3>
+          <div style="font-size:0.8rem; color:var(--text-secondary);" id="sheetStoreMeta">預計等候 5 分鐘</div>
         </div>
-        <button class="modal-close" onclick="closeOrderModal()">✕</button>
+        <button class="sheet-close" onclick="closeMenuModal()">✕</button>
       </div>
 
-      <div class="modal-body">
-        <!-- 分流優惠自動套用提示 -->
-        <div id="modalPromoBanner" style="display: none; background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e; padding: 12px 14px; border-radius: 12px; font-size: 0.86rem; font-weight: 700; margin-bottom: 16px;"></div>
+      <div class="sheet-body">
+        <div id="sheetPromoBanner" style="display:none; background:var(--brand-light); color:var(--brand-dark); padding:10px 12px; border-radius:10px; font-size:0.84rem; font-weight:700; margin-bottom:12px;"></div>
+        
+        <div id="sheetMenuContainer"></div>
 
-        <h4 style="font-size: 0.9rem; font-weight: 800; color: var(--text-secondary); margin-bottom: 10px;">🍽️ 選擇餐點品項</h4>
-        <div id="modalMenuList"></div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
+        <div class="checkout-options">
           <div>
-            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">⏰ 預計取餐時段</label>
-            <select id="orderPickupSlot" class="form-control">
-              <option value="立即製作 (約 5 分鐘取餐)">⚡ 立即製作 (依出餐號取餐)</option>
+            <label class="field-label">⏰ 取餐時間</label>
+            <select id="pickupSlotSelect" class="select-input">
+              <option value="立即製作 (約5分鐘)">⚡ 立即製作</option>
               <option value="12:10 下課取餐">12:10 下課取餐</option>
               <option value="12:25 預約取餐">12:25 預約取餐</option>
-              <option value="12:40 預約取餐">12:40 預約取餐</option>
             </select>
           </div>
           <div>
-            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">💳 付款方式</label>
-            <select id="orderPaymentMethod" class="form-control">
-              <option value="LINE Pay">🟢 LINE Pay 線上秒付</option>
-              <option value="現金付款 (取餐付現)">💵 現場取餐現金付款</option>
-              <option value="街口支付">🔴 街口支付</option>
+            <label class="field-label">💳 付款方式</label>
+            <select id="paymentSelect" class="select-input">
+              <option value="LINE Pay">LINE Pay</option>
+              <option value="現場現金付款">現場付現</option>
             </select>
           </div>
         </div>
       </div>
 
-      <div class="modal-footer">
+      <div class="sheet-footer">
         <div>
-          <div style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 600;">應付總計 <span id="modalDiscountHint" style="color:#be123c; font-weight:800;"></span></div>
-          <div style="font-size: 1.45rem; font-weight: 900; color: var(--obsidian);" id="modalTotalAmount">$0</div>
+          <div style="font-size:0.76rem; color:var(--text-secondary);">總計金額 <span id="sheetDiscountNote" style="color:var(--brand); font-weight:700;"></span></div>
+          <div style="font-size:1.4rem; font-weight:900;" id="sheetTotalPrice">$0</div>
         </div>
-        <button class="btn btn-primary" id="confirmOrderBtn" onclick="submitStudentOrder()">確認送出訂單 ➔</button>
+        <button class="btn-submit-order" id="submitOrderBtn" onclick="placeOrder()">送出預訂・領取餐號</button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== 核心前端引擎 ==================== -->
+  <!-- ==================== 底部 App 導覽列 ==================== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button class="tab-btn active" id="navBtn-viewOrder" onclick="switchView('viewOrder')">
+        <span class="icon">🍔</span>
+        <span>探索點餐</span>
+      </button>
+      <button class="tab-btn" id="navBtn-viewTickets" onclick="switchView('viewTickets')">
+        <span class="icon">🎟️</span>
+        <span>我的取餐單 (<span id="ticketCount">1</span>)</span>
+      </button>
+      <button class="tab-btn" id="navBtn-viewMerchant" onclick="switchView('viewMerchant')">
+        <span class="icon">🏪</span>
+        <span>店家接單端</span>
+      </button>
+    </div>
+  </nav>
+
   <script>
-    // 直接綁定你的 Google Apps Script 部署網址
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbzVXQRKZfnhgM_BhW6pgy1VOCg7YmCdfnAdHOS_9Tt7agxQa2r69hwg1UGL73gpoVwp/exec';
 
-    // 內建完整東吳學餐預設資料庫（確保秒開不白屏，並在背景與 Google Sheet 即時同步）
-    const FALLBACK_BUNDLE = {
-      stores: [
-        {
-          id: 'S01', campus: '雙溪校區', name: '趙班長海苔飯捲', category: '人氣韓式・飯捲',
-          maxCapacityPer15Min: 18, activeOrders: 17, avgPrepMinutes: 24, loadPercentage: 94, loadState: 'FULL',
-          promoMode: 'none', promoText: '無優惠', promoDiscount: 0, predictedDailyOrders: 240, rating: 4.9,
-          menus: [
-            { id: 'M01', name: '特製韓式泡菜燒肉飯捲', price: 75, prepTime: 4, tag: '🔥 必點人氣' },
-            { id: 'M02', name: '起司炸蝦海苔飯捲', price: 85, prepTime: 5, tag: '⭐ 主廚推薦' },
-            { id: 'M03', name: '經典鮪魚玉米飯捲', price: 65, prepTime: 3, tag: '⚡ 快速出餐' }
-          ]
-        },
-        {
-          id: 'S02', campus: '雙溪校區', name: '雙溪-丼物園', category: '日式蓋飯・烏龍麵',
-          maxCapacityPer15Min: 20, activeOrders: 4, avgPrepMinutes: 5, loadPercentage: 20, loadState: 'FREE',
-          promoMode: 'gift', promoText: '🎁 AI分流招待：免費溫泉蛋乙顆', promoDiscount: 0, predictedDailyOrders: 165, rating: 4.7,
-          menus: [
-            { id: 'M04', name: '炙燒起司牛五花丼', price: 115, prepTime: 4, tag: '🔥 招牌必點' },
-            { id: 'M05', name: '黃金厚切豬排滑蛋丼', price: 120, prepTime: 5, tag: '⭐ 飽足首選' },
-            { id: 'M06', name: '讚岐胡麻冷烏龍麵', price: 95, prepTime: 3, tag: '⚡ 3分極速出餐' }
-          ]
-        },
-        {
-          id: 'S03', campus: '雙溪校區', name: '雙溪-四海遊龍', category: '鍋貼水餃・麵食',
-          maxCapacityPer15Min: 25, activeOrders: 16, avgPrepMinutes: 14, loadPercentage: 64, loadState: 'MODERATE',
-          promoMode: 'none', promoText: '無優惠', promoDiscount: 0, predictedDailyOrders: 210, rating: 4.6,
-          menus: [
-            { id: 'M07', name: '招牌鍋貼套餐 (10顆+酸辣湯)', price: 105, prepTime: 5, tag: '🔥 經典組合' },
-            { id: 'M08', name: '高麗菜水餃 (12顆)', price: 78, prepTime: 4, tag: '⚡ 快速出餐' }
-          ]
-        },
-        {
-          id: 'S04', campus: '雙溪校區', name: '蒲家廚房', category: '中式特餐・便當',
-          maxCapacityPer15Min: 20, activeOrders: 5, avgPrepMinutes: 6, loadPercentage: 25, loadState: 'FREE',
-          promoMode: 'discount', promoText: '💰 AI分流折抵：現折 $10 元', promoDiscount: 10, predictedDailyOrders: 150, rating: 4.8,
-          menus: [
-            { id: 'M09', name: '秘製椒麻雞腿飯', price: 110, prepTime: 4, tag: '🔥 銷量冠軍' },
-            { id: 'M10', name: '蒜泥白肉精緻便當', price: 100, prepTime: 3, tag: '⚡ 極速便當' }
-          ]
-        },
-        {
-          id: 'S05', campus: '城中校區', name: '城中-咖哩食堂', category: '熟成咖哩・炸物',
-          maxCapacityPer15Min: 15, activeOrders: 15, avgPrepMinutes: 25, loadPercentage: 100, loadState: 'FULL',
-          promoMode: 'none', promoText: '無優惠', promoDiscount: 0, predictedDailyOrders: 195, rating: 4.8,
-          menus: [
-            { id: 'M11', name: '唐揚炸雞熟成咖哩飯', price: 125, prepTime: 6, tag: '🔥 排隊人氣' },
-            { id: 'M12', name: '手打漢堡排歐姆蛋咖哩', price: 135, prepTime: 7, tag: '⭐ 限量供應' }
-          ]
-        },
-        {
-          id: 'S06', campus: '城中校區', name: '城中-吳葉食堂', category: '精緻台式簡餐',
-          maxCapacityPer15Min: 20, activeOrders: 3, avgPrepMinutes: 4, loadPercentage: 15, loadState: 'FREE',
-          promoMode: 'gift', promoText: '🎁 AI分流招待：免費招牌冰紅茶', promoDiscount: 0, predictedDailyOrders: 145, rating: 4.9,
-          menus: [
-            { id: 'M13', name: '蔥爆牛肉鐵板簡餐', price: 115, prepTime: 4, tag: '🔥 現點現做' },
-            { id: 'M14', name: '古早味排骨特餐', price: 105, prepTime: 3, tag: '⚡ 4分極速取餐' },
-            { id: 'M15', name: '手工鮮蝦紅油抄手麵', price: 90, prepTime: 3, tag: '⭐ 學生最愛' }
-          ]
-        },
-        {
-          id: 'S07', campus: '城中校區', name: '大熊涼麵 X 吃好食堂', category: '手工涼麵・味噌湯',
-          maxCapacityPer15Min: 25, activeOrders: 5, avgPrepMinutes: 3, loadPercentage: 20, loadState: 'FREE',
-          promoMode: 'points', promoText: '⚡ AI分流回饋：雙倍 MealPoints 點數', promoDiscount: 0, predictedDailyOrders: 160, rating: 4.7,
-          menus: [
-            { id: 'M16', name: '川味麻辣雞絲涼麵 (大)', price: 75, prepTime: 2, tag: '⚡ 2分秒取' },
-            { id: 'M17', name: '綜合三合一味噌湯 (貢丸+蛋花)', price: 45, prepTime: 2, tag: '🔥 絕配湯品' }
-          ]
-        }
-      ],
+    const STORE_ICONS = {
+      'S01': '🍙', 'S02': '🍱', 'S03': '🥟', 'S04': '🍗',
+      'S05': '🍛', 'S06': '🥩', 'S07': '🍜'
+    };
+
+    const DEFAULT_STORES = [
+      {
+        id: 'S01', campus: '雙溪校區', name: '趙班長海苔飯捲', category: '人氣韓式飯捲',
+        maxCapacityPer15Min: 18, activeOrders: 17, avgPrepMinutes: 24,
+        promoMode: 'none', promoText: '無優惠', promoDiscount: 0, predictedDailyOrders: 240, rating: 4.9,
+        menus: [
+          { id: 'M01', name: '特製韓式泡菜燒肉飯捲', price: 75 },
+          { id: 'M02', name: '起司炸蝦海苔飯捲', price: 85 },
+          { id: 'M03', name: '經典鮪魚玉米飯捲', price: 65 }
+        ]
+      },
+      {
+        id: 'S02', campus: '雙溪校區', name: '雙溪-丼物園', category: '日式蓋飯・烏龍麵',
+        maxCapacityPer15Min: 20, activeOrders: 4, avgPrepMinutes: 5,
+        promoMode: 'gift', promoText: '🎁 免排隊招待：免費溫泉蛋乙顆', promoDiscount: 0, predictedDailyOrders: 165, rating: 4.7,
+        menus: [
+          { id: 'M04', name: '炙燒起司牛五花丼', price: 115 },
+          { id: 'M05', name: '黃金厚切豬排滑蛋丼', price: 120 },
+          { id: 'M06', name: '讚岐胡麻冷烏龍麵', price: 95 }
+        ]
+      },
+      {
+        id: 'S03', campus: '雙溪校區', name: '雙溪-四海遊龍', category: '鍋貼水餃・湯品',
+        maxCapacityPer15Min: 25, activeOrders: 14, avgPrepMinutes: 12,
+        promoMode: 'none', promoText: '無優惠', promoDiscount: 0, predictedDailyOrders: 210, rating: 4.6,
+        menus: [
+          { id: 'M07', name: '招牌鍋貼套餐 (10顆+酸辣湯)', price: 105 },
+          { id: 'M08', name: '高麗菜水餃 (12顆)', price: 78 }
+        ]
+      },
+      {
+        id: 'S04', campus: '雙溪校區', name: '蒲家廚房', category: '中式特餐便當',
+        maxCapacityPer15Min: 20, activeOrders: 5, avgPrepMinutes: 6,
+        promoMode: 'discount', promoText: '💰 免排隊折抵：現折 $10 元', promoDiscount: 10, predictedDailyOrders: 150, rating: 4.8,
+        menus: [
+          { id: 'M09', name: '秘製椒麻雞腿飯', price: 110 },
+          { id: 'M10', name: '蒜泥白肉精緻便當', price: 100 }
+        ]
+      },
+      {
+        id: 'S05', campus: '城中校區', name: '城中-咖哩食堂', category: '熟成咖哩・炸物',
+        maxCapacityPer15Min: 15, activeOrders: 15, avgPrepMinutes: 25,
+        promoMode: 'none', promoText: '無優惠', promoDiscount: 0, predictedDailyOrders: 195, rating: 4.8,
+        menus: [
+          { id: 'M11', name: '唐揚炸雞熟成咖哩飯', price: 125 },
+          { id: 'M12', name: '手打漢堡排歐姆蛋咖哩', price: 135 }
+        ]
+      },
+      {
+        id: 'S06', campus: '城中校區', name: '城中-吳葉食堂', category: '精緻台式簡餐',
+        maxCapacityPer15Min: 20, activeOrders: 3, avgPrepMinutes: 4,
+        promoMode: 'gift', promoText: '🎁 免排隊招待：免費招牌冰紅茶', promoDiscount: 0, predictedDailyOrders: 145, rating: 4.9,
+        menus: [
+          { id: 'M13', name: '蔥爆牛肉鐵板簡餐', price: 115 },
+          { id: 'M14', name: '古早味排骨特餐', price: 105 },
+          { id: 'M15', name: '手工鮮蝦紅油抄手麵', price: 90 }
+        ]
+      },
+      {
+        id: 'S07', campus: '城中校區', name: '大熊涼麵 X 吃好食堂', category: '手工涼麵・味噌湯',
+        maxCapacityPer15Min: 25, activeOrders: 5, avgPrepMinutes: 3,
+        promoMode: 'points', promoText: '🪙 免排隊回饋：雙倍點數', promoDiscount: 0, predictedDailyOrders: 160, rating: 4.7,
+        menus: [
+          { id: 'M16', name: '川味麻辣雞絲涼麵 (大)', price: 75 },
+          { id: 'M17', name: '綜合三合一味噌湯', price: 45 }
+        ]
+      }
+    ];
+
+    let state = {
+      campus: '雙溪校區',
+      filter: 'ALL',
+      stores: JSON.parse(JSON.stringify(DEFAULT_STORES)),
       orders: [
         {
-          orderId: 'ORD-1001', pickupNumber: 'S208', storeId: 'S02', storeName: '雙溪-丼物園',
-          studentId: '15111001', studentName: '楊定豊',
+          orderId: 'ORD-101', pickupNumber: 'S208', storeId: 'S02', storeName: '雙溪-丼物園',
           itemsJson: JSON.stringify([{ name: '炙燒起司牛五花丼', price: 115, qty: 1 }]),
-          subtotal: 115, discount: 0, finalTotal: 115,
-          promoApplied: '🎁 AI分流招待：免費溫泉蛋乙顆',
-          paymentMethod: 'LINE Pay', pickupTimeSlot: '12:10 下課取餐', status: '製作中',
-          isDivertedOrder: true, createdAt: '2026-10-26 12:02:15'
+          finalTotal: 115, promoApplied: '🎁 免排隊招待：免費溫泉蛋乙顆',
+          pickupTimeSlot: '12:10 下課取餐', paymentMethod: 'LINE Pay', status: '製作中'
         }
       ],
-      aiRecommendations: {}
-    };
-
-    let appState = {
-      campus: '雙溪校區',
-      stores: [],
-      orders: [],
-      aiRecommendations: {},
-      selectedStore: null,
+      activeStore: null,
       cart: {},
-      isDivertedSession: false,
-      merchantSelectedPromo: 'gift',
-      userPoints: 120
+      merchantPromoMode: 'gift'
     };
 
-    // 計算本地 AI 分流推薦邏輯
-    function recomputeLocalAI() {
-      ['雙溪校區', '城中校區'].forEach(campus => {
-        const cStores = appState.stores.filter(s => s.campus === campus);
-        cStores.forEach(s => {
-          const cap = Number(s.maxCapacityPer15Min) || 20;
-          const act = Number(s.activeOrders) || 0;
-          s.loadPercentage = Math.min(120, Math.round((act / cap) * 100));
-          s.loadState = s.loadPercentage >= 85 ? 'FULL' : (s.loadPercentage >= 50 ? 'MODERATE' : 'FREE');
-        });
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 2800);
+    }
 
-        const congested = cStores.filter(s => s.loadState === 'FULL').sort((a, b) => b.loadPercentage - a.loadPercentage);
-        const freePromo = cStores.filter(s => s.loadState === 'FREE' && s.promoMode !== 'none').sort((a, b) => a.avgPrepMinutes - b.avgPrepMinutes);
-
-        if (congested.length > 0 && freePromo.length > 0) {
-          const busy = congested[0];
-          const target = freePromo[0];
-          appState.aiRecommendations[campus] = {
-            hasAlert: true,
-            congestedStoreId: busy.id,
-            congestedStoreName: busy.name,
-            congestedWaitMin: busy.avgPrepMinutes,
-            congestedLoadPct: busy.loadPercentage,
-            recommendedStoreId: target.id,
-            recommendedStoreName: target.name,
-            recommendedWaitMin: target.avgPrepMinutes,
-            promoMode: target.promoMode,
-            promoText: target.promoText,
-            promoDiscount: Number(target.promoDiscount) || 0,
-            timeSavedMin: Math.max(5, busy.avgPrepMinutes - target.avgPrepMinutes)
-          };
-        } else {
-          appState.aiRecommendations[campus] = { hasAlert: false };
-        }
+    function switchView(viewId) {
+      ['viewOrder', 'viewTickets', 'viewMerchant'].forEach(id => {
+        document.getElementById(id).classList.toggle('active', id === viewId);
+        document.getElementById('navBtn-' + id).classList.toggle('active', id === viewId);
       });
+      renderAll();
     }
 
-    // 雲端 API 呼叫引擎
-    async function callCloudApi(action, payload = {}, silent = true) {
-      const syncPill = document.getElementById('bgSyncIndicator');
-      if (syncPill) syncPill.classList.add('active');
-
-      try {
-        const res = await fetch(GAS_URL, {
-          method: 'POST',
-          mode: 'cors',
-          redirect: 'follow',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action, ...payload })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || '雲端回應失敗');
-        return data;
-      } catch (err) {
-        console.warn('Cloud Sync Fallback:', err.message);
-        if (!silent) {
-          showToast('已更新本地即時資料（若需同步試算表請確認 GAS 已發布新版本）', 'info');
-        }
-        return null;
-      } finally {
-        if (syncPill) syncPill.classList.remove('active');
-      }
+    function switchCampus(campus) {
+      state.campus = campus;
+      document.getElementById('btnCampus-雙溪校區').classList.toggle('active', campus === '雙溪校區');
+      document.getElementById('btnCampus-城中校區').classList.toggle('active', campus === '城中校區');
+      renderStoreList();
     }
 
-    async function syncWithCloud(showNotice = false) {
-      const data = await callCloudApi('initBundle', {}, true);
-      if (data && data.bundle) {
-        appState.stores = data.bundle.stores;
-        appState.orders = data.bundle.orders;
-        appState.aiRecommendations = data.bundle.aiRecommendations;
-        renderAllViews();
-        if (showNotice) showToast('已與 Google Sheet 雲端資料庫完成同步！', 'success');
-      } else {
-        recomputeLocalAI();
-        renderAllViews();
-      }
-    }
-
-    // 導覽切換
-    function switchTab(tabId) {
-      ['tabStudent', 'tabOrders', 'tabMerchant', 'tabAnalytics'].forEach(id => {
-        document.getElementById(id).classList.toggle('active', id === tabId);
-        const nav = document.getElementById('nav-' + id);
-        if (nav) nav.classList.toggle('active', id === tabId);
+    function setFilter(f) {
+      state.filter = f;
+      ['ALL', 'FAST', 'PROMO'].forEach(k => {
+        document.getElementById('filter-' + k).classList.toggle('active', k === f);
       });
-      renderAllViews();
+      renderStoreList();
     }
 
-    function selectCampus(campus) {
-      appState.campus = campus;
-      document.getElementById('campusBtn-雙溪校區').classList.toggle('active', campus === '雙溪校區');
-      document.getElementById('campusBtn-城中校區').classList.toggle('active', campus === '城中校區');
-      document.getElementById('storeSectionHeading').innerText = `${campus} — 學餐即時產能與候餐預測`;
-      renderStudentView();
-    }
+    // 渲染學生點餐首頁
+    function renderStoreList() {
+      const campusStores = state.stores.filter(s => s.campus === state.campus);
 
-    function renderAllViews() {
-      recomputeLocalAI();
-      renderStudentView();
-      renderOrdersView();
-      populateMerchantSelect();
-      renderMerchantDashboard();
-      renderAnalyticsView();
-      document.getElementById('myOrderCountBadge').innerText = appState.orders.length;
-      document.getElementById('userPointsDisplay').innerText = appState.userPoints + ' pts';
-    }
+      // 找出塞車店與推薦免排隊店
+      const busyStore = campusStores.find(s => s.avgPrepMinutes >= 20);
+      const fastPromoStore = campusStores.find(s => s.avgPrepMinutes <= 6 && s.promoMode !== 'none');
+      const tipBox = document.getElementById('aiSmartTipBox');
 
-    // 1. 渲染學生點餐視角
-    function renderStudentView() {
-      const rec = appState.aiRecommendations[appState.campus];
-      const bannerBox = document.getElementById('aiDiversionBannerContainer');
-
-      if (rec && rec.hasAlert) {
-        bannerBox.innerHTML = `
-          <div class="ai-diversion-card">
-            <div class="ai-diversion-left">
-              <div class="ai-tag">🤖 AI 動態流量攔截與分流建議</div>
-              <div class="ai-diversion-title">
-                偵測到「${rec.congestedStoreName}」產能已達 ${rec.congestedLoadPct}%（需苦等 ${rec.congestedWaitMin} 分鐘）
-              </div>
-              <div class="ai-diversion-desc">
-                系統為您媒合鄰近空閒櫃位 <strong>【${rec.recommendedStoreName}】</strong>，預計 <strong>${rec.recommendedWaitMin} 分鐘</strong> 即可取餐（幫您省下 ${rec.timeSavedMin} 分鐘），現在一鍵轉單立即享有：<strong style="color:var(--champagne);">${rec.promoText}</strong>
-              </div>
+      if (busyStore && fastPromoStore) {
+        tipBox.innerHTML = `
+          <div class="smart-tip-card">
+            <div>
+              <div class="smart-tip-badge">⚡ AI 免排隊推薦</div>
+              <div class="smart-tip-title">「${busyStore.name}」目前需苦等 ${busyStore.avgPrepMinutes} 分鐘</div>
+              <div class="smart-tip-desc">改點 <strong>${fastPromoStore.name}</strong> 只要 <strong>${fastPromoStore.avgPrepMinutes} 分鐘</strong>，再享 ${fastPromoStore.promoText}</div>
             </div>
-            <button class="btn btn-gold" onclick="openOrderModal('${rec.recommendedStoreId}', true)">
-              ⚡ 接受 AI 分流領優惠點餐 ➔
-            </button>
+            <button class="btn-tip-action" onclick="openStoreMenu('${fastPromoStore.id}')">領優惠點餐 ➔</button>
           </div>
         `;
       } else {
-        bannerBox.innerHTML = `
-          <div class="ai-diversion-card" style="border-color: rgba(16, 185, 129, 0.4);">
-            <div class="ai-diversion-left">
-              <div class="ai-tag" style="background:#10b981; color:#fff;">✅ 全區產能順暢</div>
-              <div class="ai-diversion-title">目前 ${appState.campus} 各餐廳出餐動能充足，無須排隊久候！</div>
-            </div>
-          </div>
-        `;
+        tipBox.innerHTML = '';
       }
 
-      const campusStores = appState.stores.filter(s => s.campus === appState.campus);
-      const grid = document.getElementById('studentStoreGrid');
+      // 篩選店家
+      let list = campusStores;
+      if (state.filter === 'FAST') list = list.filter(s => s.avgPrepMinutes <= 6);
+      if (state.filter === 'PROMO') list = list.filter(s => s.promoMode !== 'none');
 
-      grid.innerHTML = campusStores.map(store => {
-        const isRecommended = rec && rec.hasAlert && rec.recommendedStoreId === store.id;
-        let badgeHtml = `<span class="badge badge-free">空閒順暢 (${store.avgPrepMinutes}分取餐)</span>`;
-        let barColor = '#10b981';
-
-        if (store.loadState === 'FULL') {
-          badgeHtml = `<span class="badge badge-full">產能超載 (${store.avgPrepMinutes}分以上)</span>`;
-          barColor = '#f43f5e';
-        } else if (store.loadState === 'MODERATE') {
-          badgeHtml = `<span class="badge badge-mod">人潮適中 (${store.avgPrepMinutes}分取餐)</span>`;
-          barColor = '#f59e0b';
+      const container = document.getElementById('storeListContainer');
+      container.innerHTML = list.map(s => {
+        let waitClass = 'wait-free';
+        let waitText = `⚡ 約 ${s.avgPrepMinutes} 分鐘取餐`;
+        if (s.avgPrepMinutes >= 20) {
+          waitClass = 'wait-full';
+          waitText = `🔥 排隊久候 (${s.avgPrepMinutes}分)`;
+        } else if (s.avgPrepMinutes >= 10) {
+          waitClass = 'wait-mod';
+          waitText = `⏳ 約 ${s.avgPrepMinutes} 分鐘`;
         }
 
-        const promoHtml = (store.promoMode !== 'none' && store.loadState === 'FREE')
-          ? `<div class="store-promo-ribbon">${store.promoText}</div>`
-          : `<div style="height: 12px;"></div>`;
+        const icon = STORE_ICONS[s.id] || '🍱';
+        const hasPromo = s.promoMode !== 'none' && s.avgPrepMinutes <= 10;
 
         return `
-          <div class="store-card ${isRecommended ? 'recommended-highlight' : ''}">
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-                <div>
-                  <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary);">${store.category} ・ ⭐ ${store.rating}</span>
-                  <h3 style="font-size:1.18rem; font-weight:900; color:var(--obsidian); margin-top:2px;">
-                    ${store.name}
-                    ${isRecommended ? '<span class="badge badge-gold" style="margin-left:6px;">🔥 AI 首選分流</span>' : ''}
-                  </h3>
-                </div>
-                ${badgeHtml}
+          <div class="store-card" onclick="openStoreMenu('${s.id}')">
+            <div class="store-thumb">${icon}</div>
+            <div class="store-info">
+              <div class="store-header-row">
+                <div class="store-name">${s.name}</div>
+                <span class="wait-pill ${waitClass}">${waitText}</span>
               </div>
-
-              ${promoHtml}
-
-              <div class="load-bar-track">
-                <div class="load-bar-fill" style="width:${Math.min(100, store.loadPercentage)}%; background:${barColor};"></div>
-              </div>
-              <div class="store-metrics-row">
-                <span>廚房即時負載：<strong>${store.loadPercentage}%</strong> (${store.activeOrders}/${store.maxCapacityPer15Min}單)</span>
-                <span>預估候餐：<strong>約 ${store.avgPrepMinutes} 分鐘</strong></span>
-              </div>
-            </div>
-
-            <div style="display:flex; gap:8px; margin-top:6px;">
-              ${store.loadState === 'FULL' ? `
-                <button class="btn btn-secondary" style="flex:1;" onclick="openOrderModal('${store.id}', false)">
-                  ⚠️ 排隊預約 (需久候)
-                </button>
-              ` : `
-                <button class="btn ${isRecommended ? 'btn-gold' : 'btn-primary'}" style="flex:1;" onclick="openOrderModal('${store.id}', ${isRecommended})">
-                  ${isRecommended ? '🎁 領取分流優惠點餐 ➔' : '立即線上點餐 ➔'}
-                </button>
-              `}
+              <div class="store-meta">⭐ ${s.rating} ・ ${s.category} ・ 待製 ${s.activeOrders} 單</div>
+              ${hasPromo ? `<div class="promo-tag">${s.promoText}</div>` : ''}
             </div>
           </div>
         `;
       }).join('');
     }
 
-    // 開啟點餐視窗
-    function openOrderModal(storeId, isDiverted = false) {
-      const store = appState.stores.find(s => s.id === storeId);
+    // 開啟餐廳菜單抽屜
+    function openStoreMenu(storeId) {
+      const store = state.stores.find(s => s.id === storeId);
       if (!store) return;
 
-      appState.selectedStore = store;
-      appState.isDivertedSession = isDiverted || (store.loadState === 'FREE' && store.promoMode !== 'none');
-      appState.cart = {};
-
-      // 預設第一項商品數量為 1，方便快速測試
+      state.activeStore = store;
+      state.cart = {};
       if (store.menus && store.menus.length > 0) {
-        appState.cart[store.menus[0].id] = 1;
+        state.cart[store.menus[0].id] = 1;
       }
 
-      document.getElementById('modalStoreCampus').innerText = store.campus + ' ・ ' + store.category;
-      document.getElementById('modalStoreTitle').innerText = store.name;
+      document.getElementById('sheetStoreName').innerText = store.name;
+      document.getElementById('sheetStoreMeta').innerText = `${store.campus} ・ 預估約 ${store.avgPrepMinutes} 分鐘取餐`;
 
-      const promoBanner = document.getElementById('modalPromoBanner');
-      if (appState.isDivertedSession && store.promoMode !== 'none') {
+      const promoBanner = document.getElementById('sheetPromoBanner');
+      if (store.promoMode !== 'none' && store.avgPrepMinutes <= 10) {
         promoBanner.style.display = 'block';
-        promoBanner.innerHTML = `🎉 <strong>已觸發 AI 智慧分流禮遇：</strong> 本單自動套用「${store.promoText}」！`;
+        promoBanner.innerText = `🎉 本單已自動套用：${store.promoText}`;
       } else {
         promoBanner.style.display = 'none';
       }
 
-      renderModalMenuItems();
-      document.getElementById('orderModal').classList.add('open');
+      renderSheetMenu();
+      document.getElementById('menuModal').classList.add('open');
     }
 
-    function closeOrderModal() {
-      document.getElementById('orderModal').classList.remove('open');
+    function closeMenuModal() {
+      document.getElementById('menuModal').classList.remove('open');
     }
 
-    function updateCartQty(menuId, delta) {
-      const cur = appState.cart[menuId] || 0;
+    function changeQty(menuId, delta) {
+      const cur = state.cart[menuId] || 0;
       const next = Math.max(0, cur + delta);
-      if (next === 0) delete appState.cart[menuId];
-      else appState.cart[menuId] = next;
-      renderModalMenuItems();
+      if (next === 0) delete state.cart[menuId];
+      else state.cart[menuId] = next;
+      renderSheetMenu();
     }
 
-    function renderModalMenuItems() {
-      const store = appState.selectedStore;
+    function renderSheetMenu() {
+      const store = state.activeStore;
       if (!store) return;
-      const menus = store.menus || [];
-      const listEl = document.getElementById('modalMenuList');
 
       let subtotal = 0;
-      listEl.innerHTML = menus.map(m => {
-        const qty = appState.cart[m.id] || 0;
+      const html = (store.menus || []).map(m => {
+        const qty = state.cart[m.id] || 0;
         subtotal += m.price * qty;
         return `
-          <div class="menu-item-row">
+          <div class="menu-item">
             <div>
-              <div style="font-size:0.74rem; color:var(--accent-indigo); font-weight:800;">${m.tag || '新鮮現做'}</div>
-              <div style="font-weight:800; color:var(--obsidian); font-size:0.96rem;">${m.name}</div>
-              <div style="font-size:0.86rem; color:var(--text-secondary); font-weight:700;">$${m.price}</div>
+              <div class="item-title">${m.name}</div>
+              <div class="item-price">$${m.price}</div>
             </div>
-            <div class="qty-control">
-              <button type="button" class="qty-btn" onclick="updateCartQty('${m.id}', -1)">－</button>
-              <span style="font-weight:800; min-width:20px; text-align:center;">${qty}</span>
-              <button type="button" class="qty-btn" onclick="updateCartQty('${m.id}', 1)">＋</button>
+            <div class="qty-stepper">
+              <button class="step-btn" onclick="changeQty('${m.id}', -1)">－</button>
+              <span style="font-weight:800; min-width:18px; text-align:center;">${qty}</span>
+              <button class="step-btn plus" onclick="changeQty('${m.id}', 1)">＋</button>
             </div>
           </div>
         `;
       }).join('');
 
+      document.getElementById('sheetMenuContainer').innerHTML = html;
+
       let discount = 0;
-      const discountHintEl = document.getElementById('modalDiscountHint');
-      if (subtotal > 0 && appState.isDivertedSession && store.promoMode === 'discount') {
+      const noteEl = document.getElementById('sheetDiscountNote');
+      if (subtotal > 0 && store.promoMode === 'discount' && store.avgPrepMinutes <= 10) {
         discount = Number(store.promoDiscount) || 10;
-        discountHintEl.innerText = `(已折抵 -$${discount})`;
+        noteEl.innerText = `(已折 -$${discount})`;
       } else {
-        discountHintEl.innerText = '';
+        noteEl.innerText = '';
       }
 
-      const finalTotal = Math.max(0, subtotal - discount);
-      document.getElementById('modalTotalAmount').innerText = `$${finalTotal}`;
+      document.getElementById('sheetTotalPrice').innerText = `$${Math.max(0, subtotal - discount)}`;
     }
 
-    async function submitStudentOrder() {
-      const store = appState.selectedStore;
+    async function placeOrder() {
+      const store = state.activeStore;
       if (!store) return;
 
       const items = [];
       let subtotal = 0;
       (store.menus || []).forEach(m => {
-        const qty = appState.cart[m.id] || 0;
-        if (qty > 0) {
-          items.push({ id: m.id, name: m.name, price: m.price, qty });
-          subtotal += m.price * qty;
+        const q = state.cart[m.id] || 0;
+        if (q > 0) {
+          items.push({ id: m.id, name: m.name, price: m.price, qty: q });
+          subtotal += m.price * q;
         }
       });
 
       if (items.length === 0) {
-        showToast('請至少選擇一項餐點！', 'info');
+        showToast('請至少選擇一項餐點');
         return;
       }
 
-      const discount = (appState.isDivertedSession && store.promoMode === 'discount') ? (Number(store.promoDiscount) || 10) : 0;
+      const discount = (store.promoMode === 'discount' && store.avgPrepMinutes <= 10) ? (Number(store.promoDiscount) || 10) : 0;
       const finalTotal = Math.max(0, subtotal - discount);
-      const promoApplied = (appState.isDivertedSession && store.promoMode !== 'none') ? store.promoText : '一般點餐';
-      const pickupTimeSlot = document.getElementById('orderPickupSlot').value;
-      const paymentMethod = document.getElementById('orderPaymentMethod').value;
+      const promoApplied = (store.promoMode !== 'none' && store.avgPrepMinutes <= 10) ? store.promoText : '一般預訂';
+      const pickupTimeSlot = document.getElementById('pickupSlotSelect').value;
+      const paymentMethod = document.getElementById('paymentSelect').value;
 
-      const btn = document.getElementById('confirmOrderBtn');
-      btn.disabled = true;
-      btn.innerText = '傳送訂單中...';
+      const prefix = store.campus === '城中校區' ? 'C' : 'S';
+      const pickupNumber = prefix + Math.floor(100 + Math.random() * 899);
 
-      const payload = {
-        campus: store.campus,
+      const newOrder = {
+        orderId: 'ORD-' + Date.now(),
+        pickupNumber,
         storeId: store.id,
         storeName: store.name,
-        studentId: '15111001',
-        studentName: '楊定豊',
-        items,
+        itemsJson: JSON.stringify(items),
         subtotal,
         discount,
         finalTotal,
         promoApplied,
-        paymentMethod,
         pickupTimeSlot,
-        isDivertedOrder: appState.isDivertedSession
+        paymentMethod,
+        status: '製作中'
       };
 
-      // 先行本地樂觀更新，確保秒速體驗
-      const prefix = store.campus === '城中校區' ? 'C' : 'S';
-      const localPickupNo = prefix + Math.floor(100 + Math.random() * 899);
-      const newOrderObj = {
-        orderId: 'ORD-' + Math.floor(10000 + Math.random() * 89999),
-        pickupNumber: localPickupNo,
-        ...payload,
-        itemsJson: JSON.stringify(items),
-        status: '製作中',
-        createdAt: new Date().toLocaleTimeString('zh-TW', { hour12: false })
-      };
+      state.orders.unshift(newOrder);
+      store.activeOrders += 1;
 
-      appState.orders.unshift(newOrderObj);
-      store.activeOrders = (Number(store.activeOrders) || 0) + 1;
-      if (appState.isDivertedSession) {
-        appState.userPoints += 25;
-      }
+      closeMenuModal();
+      switchView('viewTickets');
+      showToast(`✅ 預訂成功！取餐號碼：${pickupNumber}`);
 
-      closeOrderModal();
-      btn.disabled = false;
-      btn.innerText = '確認送出訂單 ➔';
-
-      renderAllViews();
-      switchTab('tabOrders');
-      showToast(`🎉 點餐成功！您的免排隊取餐號為【${localPickupNo}】`, 'success');
-
-      // 同步寫入 Google Sheet
-      callCloudApi('submitOrder', payload, true);
+      // 背景同步至 Google Sheet
+      try {
+        fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'submitOrder',
+            campus: store.campus,
+            storeId: store.id,
+            storeName: store.name,
+            studentName: '楊定豊',
+            items,
+            subtotal,
+            discount,
+            finalTotal,
+            promoApplied,
+            paymentMethod,
+            pickupTimeSlot,
+            isDivertedOrder: store.promoMode !== 'none'
+          })
+        });
+      } catch (e) {}
     }
 
-    // 2. 渲染學生數位取餐號頁面
-    function renderOrdersView() {
-      const container = document.getElementById('studentOrdersContainer');
-      if (!appState.orders || appState.orders.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:30px;">目前尚無點餐紀錄，快去體驗 AI 分流點餐吧！</p>';
+    // 渲染我的取餐號碼牌
+    function renderTickets() {
+      document.getElementById('ticketCount').innerText = state.orders.length;
+      const box = document.getElementById('ticketsContainer');
+      if (state.orders.length === 0) {
+        box.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:40px 0;">尚無取餐單</p>';
         return;
       }
 
-      container.innerHTML = appState.orders.map(o => {
+      box.innerHTML = state.orders.map(o => {
         let items = [];
-        try { items = typeof o.itemsJson === 'string' ? JSON.parse(o.itemsJson) : (o.items || []); } catch (e) {}
-        const itemStr = items.map(i => `${i.name} x${i.qty}`).join('、');
+        try { items = JSON.parse(o.itemsJson || '[]'); } catch (e) {}
+        const itemText = items.map(i => `${i.name} x${i.qty}`).join('、');
 
-        let statusBadge = '<span class="badge badge-mod">🍳 廚房製作中</span>';
-        if (o.status === '可取餐') statusBadge = '<span class="badge badge-free">🔔 可立即取餐</span>';
-        if (o.status === '已完成') statusBadge = '<span class="badge badge-blue">✅ 已領取完成</span>';
-
+        const isReady = o.status === '可取餐';
         return `
-          <div style="border:1.5px solid #e2e8f0; border-radius:16px; padding:18px 22px; margin-bottom:14px; background:#ffffff; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-            <div style="display:flex; align-items:center; gap:18px;">
-              <div style="background:var(--obsidian); color:var(--champagne); border-radius:14px; padding:12px 18px; text-align:center; min-width:96px;">
-                <div style="font-size:0.7rem; color:#cbd5e1; font-weight:700;">數位取餐號</div>
-                <div style="font-size:1.6rem; font-weight:900; letter-spacing:1px;">${o.pickupNumber}</div>
-              </div>
-              <div>
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                  <strong style="font-size:1.1rem; color:var(--obsidian);">${o.storeName}</strong>
-                  ${statusBadge}
-                  ${o.isDivertedOrder ? '<span class="badge badge-gold">⚡ AI分流禮遇單</span>' : ''}
-                </div>
-                <div style="font-size:0.9rem; color:var(--text-main); font-weight:600; margin-bottom:4px;">餐點：${itemStr}</div>
-                <div style="font-size:0.82rem; color:var(--text-secondary);">
-                  🎁 優惠：<strong style="color:#b45309;">${o.promoApplied}</strong> ・ ⏰ 時段：${o.pickupTimeSlot} ・ 💳 ${o.paymentMethod}
-                </div>
-              </div>
+          <div class="ticket-card">
+            <div class="ticket-number-box">
+              <div style="font-size:0.7rem; font-weight:700;">取餐號</div>
+              <div class="num">${o.pickupNumber}</div>
             </div>
-            <div style="text-align:right;">
-              <div style="font-size:0.78rem; color:var(--text-secondary);">實付金額</div>
-              <div style="font-size:1.4rem; font-weight:900; color:var(--obsidian);">$${o.finalTotal}</div>
+            <div style="flex:1;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <strong style="font-size:1.02rem;">${o.storeName}</strong>
+                <span class="wait-pill ${isReady ? 'wait-free' : 'wait-mod'}">${isReady ? '🔔 可立即取餐' : '🍳 廚房製作中'}</span>
+              </div>
+              <div style="font-size:0.88rem; font-weight:600; margin-bottom:4px;">${itemText}</div>
+              <div style="font-size:0.78rem; color:var(--text-secondary);">
+                ${o.promoApplied} ・ ${o.pickupTimeSlot} ・ <strong>$${o.finalTotal}</strong>
+              </div>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    // 3. 店家後台管理與廚房語音播報
-    function populateMerchantSelect() {
-      const select = document.getElementById('merchantStoreSelect');
-      const prev = select.value;
-      select.innerHTML = appState.stores.map(s => `<option value="${s.id}">${s.campus} — ${s.name}</option>`).join('');
-      if (prev && appState.stores.some(s => s.id === prev)) {
-        select.value = prev;
-      } else if (appState.stores.length > 1) {
-        select.value = 'S02'; // 預設展示開啟分流優惠的「雙溪-丼物園」
+    // 渲染店家接單頁籤
+    function initMerchantSelect() {
+      const sel = document.getElementById('merchantSelect');
+      if (sel.options.length === 0) {
+        sel.innerHTML = state.stores.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        sel.value = 'S02';
       }
     }
 
-    function renderMerchantDashboard() {
-      const storeId = document.getElementById('merchantStoreSelect').value;
-      const store = appState.stores.find(s => s.id === storeId) || appState.stores[0];
+    function renderMerchantView() {
+      initMerchantSelect();
+      const storeId = document.getElementById('merchantSelect').value;
+      const store = state.stores.find(s => s.id === storeId) || state.stores[0];
       if (!store) return;
 
-      document.getElementById('merchStatPredicted').innerText = (store.predictedDailyOrders || 160) + ' 份';
-      document.getElementById('merchStatActive').innerText = store.activeOrders + ' 單';
-      document.getElementById('merchStatLoad').innerText = store.loadPercentage + '%';
+      document.getElementById('merchPredictLabel').innerText = `🤖 AI 今日備料預測：${store.predictedDailyOrders || 160} 份`;
+      setMerchantPromo(store.promoMode || 'none', false);
+      document.getElementById('merchCustomText').value = store.promoText || '';
 
-      document.getElementById('merchPromoTextInput').value = store.promoText || '';
-      document.getElementById('merchMaxCapInput').value = store.maxCapacityPer15Min || 20;
-      document.getElementById('merchActiveOrdersInput').value = store.activeOrders || 0;
-
-      selectMerchantPromo(store.promoMode || 'none', false);
-
-      // 渲染該店家訂單佇列
-      const storeOrders = appState.orders.filter(o => o.storeId === store.id);
-      const tbody = document.getElementById('merchantOrdersTableBody');
-
+      const storeOrders = state.orders.filter(o => o.storeId === store.id);
+      const listEl = document.getElementById('merchantOrderList');
       if (storeOrders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">目前無待處理訂單</td></tr>';
-      } else {
-        tbody.innerHTML = storeOrders.map(o => {
-          let items = [];
-          try { items = typeof o.itemsJson === 'string' ? JSON.parse(o.itemsJson) : (o.items || []); } catch (e) {}
-          const itemStr = items.map(i => `${i.name} x${i.qty}`).join('、');
-
-          return `
-            <tr>
-              <td><strong style="font-size:1.05rem; color:var(--accent-indigo);">${o.pickupNumber}</strong></td>
-              <td>${o.studentName}</td>
-              <td style="font-weight:700;">${itemStr}</td>
-              <td>${o.isDivertedOrder ? `<span class="badge badge-gold">${o.promoApplied}</span>` : '-'}</td>
-              <td><strong>$${o.finalTotal}</strong></td>
-              <td>${o.pickupTimeSlot}</td>
-              <td><span class="badge ${o.status === '可取餐' ? 'badge-free' : 'badge-mod'}">${o.status}</span></td>
-              <td>
-                <div style="display:flex; gap:6px;">
-                  <button class="btn btn-secondary btn-sm" onclick="speakOrder('${o.pickupNumber}', '${itemStr}', '${o.promoApplied}')">🔊 語音讀單</button>
-                  <button class="btn btn-primary btn-sm" onclick="changeOrderStatus('${o.orderId}', '可取餐', '${o.pickupNumber}')">🔔 通知取餐</button>
-                  <button class="btn btn-secondary btn-sm" onclick="changeOrderStatus('${o.orderId}', '已完成', '${o.pickupNumber}')">✅ 完成</button>
-                </div>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
-
-    function selectMerchantPromo(mode, updateDefaultText = true) {
-      appState.merchantSelectedPromo = mode;
-      ['none', 'gift', 'discount', 'points'].forEach(m => {
-        const el = document.getElementById('promoCard-' + m);
-        if (el) el.classList.toggle('selected', m === mode);
-      });
-
-      if (updateDefaultText) {
-        const textInput = document.getElementById('merchPromoTextInput');
-        if (mode === 'none') textInput.value = '無優惠';
-        if (mode === 'gift') textInput.value = '🎁 AI分流招待：免費招牌小菜/冰紅茶乙份';
-        if (mode === 'discount') textInput.value = '💰 AI分流折抵：每單現折 $10 元';
-        if (mode === 'points') textInput.value = '⚡ AI分流回饋：贈送雙倍 MealPoints 積分';
-      }
-    }
-
-    async function saveMerchantSettings() {
-      const storeId = document.getElementById('merchantStoreSelect').value;
-      const store = appState.stores.find(s => s.id === storeId);
-      if (!store) return;
-
-      const promoMode = appState.merchantSelectedPromo;
-      const promoText = document.getElementById('merchPromoTextInput').value.trim();
-      const maxCapacityPer15Min = parseInt(document.getElementById('merchMaxCapInput').value, 10) || 20;
-      const activeOrders = parseInt(document.getElementById('merchActiveOrdersInput').value, 10) || 0;
-      const promoDiscount = promoMode === 'discount' ? 10 : 0;
-
-      store.promoMode = promoMode;
-      store.promoText = promoText;
-      store.promoDiscount = promoDiscount;
-      store.maxCapacityPer15Min = maxCapacityPer15Min;
-      store.activeOrders = activeOrders;
-      store.avgPrepMinutes = Math.max(3, Math.round(activeOrders * 1.3));
-
-      renderAllViews();
-      showToast(`已儲存「${store.name}」的 AI 分流與產能配置！`, 'success');
-
-      await callCloudApi('updateStoreConfig', {
-        storeId, promoMode, promoText, promoDiscount, maxCapacityPer15Min, activeOrders
-      }, true);
-    }
-
-    async function changeOrderStatus(orderId, newStatus, pickupNo) {
-      const ord = appState.orders.find(o => o.orderId === orderId);
-      if (ord) {
-        ord.status = newStatus;
-        if (newStatus === '可取餐') {
-          speakText(`請取餐號 ${pickupNo} 號的同學，至專屬快速通道領取您的餐點。`);
-        }
-      }
-      renderAllViews();
-      showToast(`訂單 ${pickupNo} 已更新為「${newStatus}」`, 'success');
-      await callCloudApi('updateOrderStatus', { orderId, newStatus }, true);
-    }
-
-    // 廚房免觸控語音播報引擎 (Web Speech API)
-    function speakText(text) {
-      if (!('speechSynthesis' in window)) {
-        showToast('您的瀏覽器不支援語音合成功能', 'info');
+        listEl.innerHTML = '<p style="color:var(--text-muted); font-size:0.86rem; text-align:center; padding:16px;">目前無待製餐點</p>';
         return;
       }
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'zh-TW';
-      utter.rate = 1.02;
-      window.speechSynthesis.speak(utter);
-    }
 
-    function speakOrder(pickupNo, itemStr, promo) {
-      const msg = `廚房新訂單播報，取餐號 ${pickupNo}，餐點內容：${itemStr}。套用優惠：${promo}`;
-      speakText(msg);
-      showToast(`🔊 正在為廚房語音播報：${pickupNo}`, 'info');
-    }
-
-    function testVoiceBroadcast() {
-      speakText('MealFlow 智慧廚房語音系統連線正常。新進分流訂單，取餐號 S 二零八，炙燒起司牛五花丼一份，贈送免費溫泉蛋乙顆！');
-      showToast('🔊 已啟動廚房免觸控語音播報示範！', 'success');
-    }
-
-    // 4. 渲染校級流量監控中心
-    function renderAnalyticsView() {
-      const tbody = document.getElementById('analyticsStoreTableBody');
-      tbody.innerHTML = appState.stores.map(s => {
-        let badge = `<span class="badge badge-free">${s.loadPercentage}% 順暢</span>`;
-        if (s.loadState === 'FULL') badge = `<span class="badge badge-full">${s.loadPercentage}% 超載攔截中</span>`;
-        else if (s.loadState === 'MODERATE') badge = `<span class="badge badge-mod">${s.loadPercentage}% 適中</span>`;
+      listEl.innerHTML = storeOrders.map(o => {
+        let items = [];
+        try { items = JSON.parse(o.itemsJson || '[]'); } catch (e) {}
+        const itemText = items.map(i => `${i.name} x${i.qty}`).join('、');
 
         return `
-          <tr>
-            <td><strong>${s.campus}</strong></td>
-            <td><strong>${s.name}</strong></td>
-            <td>${s.maxCapacityPer15Min} 單 / 15分</td>
-            <td>${s.activeOrders} 單</td>
-            <td>${badge}</td>
-            <td>約 ${s.avgPrepMinutes} 分鐘</td>
-            <td>${s.promoMode !== 'none' ? `<span class="badge badge-gold">${s.promoText}</span>` : '<span style="color:#94a3b8;">未開啟分流</span>'}</td>
-            <td><strong>${s.predictedDailyOrders} 份</strong></td>
-          </tr>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); gap:10px; flex-wrap:wrap;">
+            <div>
+              <strong style="color:var(--brand); font-size:1rem;">#${o.pickupNumber}</strong>
+              <span style="font-weight:700; margin-left:6px;">${itemText}</span>
+              <div style="font-size:0.78rem; color:var(--text-secondary);">${o.promoApplied} ・ ${o.pickupTimeSlot}</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="filter-chip" onclick="speakOrder('${o.pickupNumber}', '${itemText}')">🔊 讀單</button>
+              <button class="btn-tip-action" style="padding:6px 12px; font-size:0.8rem;" onclick="markOrderReady('${o.orderId}', '${o.pickupNumber}')">🔔 通知取餐</button>
+            </div>
+          </div>
         `;
       }).join('');
     }
 
-    // 評審 Demo 專用：一鍵切換尖峰爆滿 vs 離峰情境
-    async function triggerTrafficSim(mode) {
-      appState.stores.forEach(s => {
-        if (mode === 'PEAK') {
-          if (s.id === 'S01' || s.id === 'S05') {
-            s.activeOrders = 18;
-            s.avgPrepMinutes = 25;
-          } else if (s.id === 'S02' || s.id === 'S06') {
-            s.activeOrders = 3;
-            s.avgPrepMinutes = 4;
-          }
-        } else {
-          s.activeOrders = 6;
-          s.avgPrepMinutes = 7;
-        }
+    function setMerchantPromo(mode, autoFill = true) {
+      state.merchantPromoMode = mode;
+      ['none', 'gift', 'discount', 'points'].forEach(k => {
+        document.getElementById('pBtn-' + k).classList.toggle('active', k === mode);
       });
-      renderAllViews();
-      showToast(mode === 'PEAK' ? '🔥 已啟動「中午 12:10 尖峰大塞車」情境，AI 分流攔截已自動觸發！' : '✅ 已切換為全校區離峰順暢狀態！', 'success');
-      callCloudApi('simulateTraffic', { mode }, true);
+      if (autoFill) {
+        const input = document.getElementById('merchCustomText');
+        if (mode === 'none') input.value = '無優惠';
+        if (mode === 'gift') input.value = '🎁 免排隊招待：免費招牌冰紅茶/溫泉蛋';
+        if (mode === 'discount') input.value = '💰 免排隊折抵：現折 $10 元';
+        if (mode === 'points') input.value = '🪙 免排隊回饋：雙倍點數';
+      }
     }
 
-    function showToast(msg, type = 'info') {
-      const container = document.getElementById('toastContainer');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = `<span>✨</span><span>${msg}</span>`;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 3400);
+    function saveMerchantPromo() {
+      const storeId = document.getElementById('merchantSelect').value;
+      const store = state.stores.find(s => s.id === storeId);
+      if (!store) return;
+
+      store.promoMode = state.merchantPromoMode;
+      store.promoText = document.getElementById('merchCustomText').value.trim();
+      store.promoDiscount = state.merchantPromoMode === 'discount' ? 10 : 0;
+
+      renderAll();
+      showToast(`已更新「${store.name}」的分流優惠！`);
+
+      try {
+        fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'updateStoreConfig',
+            storeId: store.id,
+            promoMode: store.promoMode,
+            promoText: store.promoText,
+            promoDiscount: store.promoDiscount
+          })
+        });
+      } catch (e) {}
     }
 
-    // 啟動初始化
+    function markOrderReady(orderId, pickupNo) {
+      const ord = state.orders.find(o => o.orderId === orderId);
+      if (ord) ord.status = '可取餐';
+      renderAll();
+      speakOrder(pickupNo, '餐點已製作完成，請至快速櫃檯取餐');
+      showToast(`已通知 #${pickupNo} 取餐`);
+    }
+
+    function speakOrder(pickupNo, text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(`取餐號 ${pickupNo}，${text}`);
+      u.lang = 'zh-TW';
+      window.speechSynthesis.speak(u);
+    }
+
+    function speakSample() {
+      speakOrder('S208', '炙燒起司牛五花丼一份，分流招待免費溫泉蛋乙顆');
+      showToast('🔊 正在播放廚房語音讀單');
+    }
+
+    async function syncCloud() {
+      try {
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'initBundle' })
+        });
+        const data = await res.json();
+        if (data && data.bundle && data.bundle.stores) {
+          state.stores = data.bundle.stores;
+          if (data.bundle.orders && data.bundle.orders.length > 0) {
+            state.orders = data.bundle.orders;
+          }
+          renderAll();
+        }
+      } catch (e) {}
+    }
+
+    function renderAll() {
+      renderStoreList();
+      renderTickets();
+      renderMerchantView();
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
-      appState.stores = JSON.parse(JSON.stringify(FALLBACK_BUNDLE.stores));
-      appState.orders = JSON.parse(JSON.stringify(FALLBACK_BUNDLE.orders));
-      renderAllViews();
-      syncWithCloud(false);
+      renderAll();
+      syncCloud();
     });
   </script>
 </body>
