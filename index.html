@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MealFlow 學餐 AI 流量管制塔</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #ff6b6b;
+      --primary-dark: #ee5253;
+      --bg-color: #f7f9fc;
+      --card-bg: #ffffff;
+      --text-main: #2d3436;
+      --text-muted: #636e72;
+      --border: #dfe6e9;
+      --shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Noto Sans TC', sans-serif; }
+    body { background: var(--bg-color); color: var(--text-main); }
+    
+    /* 導覽列 */
+    header { background: #fff; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100;}
+    .logo { font-size: 1.2rem; font-weight: 900; color: var(--primary); }
+    .view-toggle { background: #f1f2f6; border: none; padding: 8px 15px; border-radius: 20px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+    .view-toggle:hover { background: #dfe6e9; }
+
+    /* 主要容器 */
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; display: none; }
+    .container.active { display: block; animation: fadeIn 0.3s ease; }
+
+    /* 學生端 UI */
+    .ai-banner { background: linear-gradient(135deg, #ff9ff3 0%, #feca57 100%); padding: 15px; border-radius: 12px; color: #fff; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(254, 202, 87, 0.4); display: flex; align-items: flex-start; gap: 10px; }
+    .ai-banner-icon { font-size: 1.5rem; }
+    .ai-banner-text h3 { font-size: 1rem; font-weight: 900; margin-bottom: 4px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+    .ai-banner-text p { font-size: 0.85rem; line-height: 1.4; font-weight: 500; }
+    .banner-btn { background: #fff; color: #ff6b6b; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; margin-top: 10px; cursor: pointer; }
+
+    .store-card { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: var(--shadow); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;}
+    .store-info h3 { font-size: 1.1rem; margin-bottom: 5px; }
+    .store-status { font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 5px;}
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red { background: #ff4757; } .dot-green { background: #2ed573; }
+    .order-btn { background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .order-btn:disabled { background: #ced6e0; cursor: not-allowed; }
+
+    /* 店家端 UI */
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    .dash-card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border); text-align: center; }
+    .dash-card h4 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; }
+    .dash-card .value { font-size: 1.5rem; font-weight: 900; color: var(--primary); }
+
+    .control-panel { background: #fff; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 20px; }
+    .control-panel h3 { font-size: 1rem; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+    .radio-group { display: flex; flex-direction: column; gap: 10px; }
+    .radio-label { display: flex; align-items: center; gap: 10px; background: #f1f2f6; padding: 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; border: 2px solid transparent;}
+    .radio-label:has(input:checked) { border-color: var(--primary); background: #fff0f0; color: var(--primary-dark); font-weight: 700;}
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">🍔 MealFlow</div>
+    <button class="view-toggle" onclick="toggleView()">切換至：店家後台</button>
+  </header>
+
+  <!-- ================= 學生端視角 ================= -->
+  <div id="studentView" class="container active">
+    <!-- AI 智慧分流推播 -->
+    <div class="ai-banner">
+      <div class="ai-banner-icon">🤖</div>
+      <div class="ai-banner-text">
+        <h3>AI 分流建議：避開擁擠，享優惠！</h3>
+        <p>「城中咖哩食堂」目前排隊預估需等候 25 分鐘。現在點「吳葉食堂」不僅免排隊，店家還免費招待 <strong>冰紅茶一杯</strong>！</p>
+        <button class="banner-btn" onclick="alert('已為您跳轉至吳葉食堂，並套用贈品優惠！')">立即點餐領取優惠 ➔</button>
+      </div>
+    </div>
+
+    <h2 style="font-size: 1.2rem; margin-bottom: 15px;">附近學餐</h2>
+    
+    <div class="store-card">
+      <div class="store-info">
+        <h3>城中-咖哩食堂</h3>
+        <div class="store-status">
+          <span class="status-dot dot-red"></span> 爆滿 (等候約 25 分鐘)
+        </div>
+      </div>
+      <button class="order-btn" disabled>暫停接單</button>
+    </div>
+
+    <div class="store-card" style="border: 2px solid var(--primary);">
+      <div class="store-info">
+        <h3>城中-吳葉食堂 <span style="background: #ffeaa7; color: #d35400; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 900;">🔥 分流優惠中</span></h3>
+        <div class="store-status">
+          <span class="status-dot dot-green"></span> 空閒 (約 5 分鐘出餐)
+        </div>
+      </div>
+      <button class="order-btn" onclick="submitOrder()">點餐</button>
+    </div>
+  </div>
+
+  <!-- ================= 店家端視角 ================= -->
+  <div id="storeView" class="container">
+    <h2 style="font-size: 1.2rem; margin-bottom: 15px;">吳葉食堂 - 智慧後台</h2>
+
+    <!-- AI 備餐預測 -->
+    <div class="dashboard-grid">
+      <div class="dash-card">
+        <h4>📊 AI 今日預估來客</h4>
+        <div class="value">120 <span style="font-size: 0.9rem; color: #2ed573;">↑15%</span></div>
+        <div style="font-size: 0.7rem; color: #b2bec3; margin-top: 5px;">(天氣晴朗 + 期中考週)</div>
+      </div>
+      <div class="dash-card">
+        <h4>⏳ 目前待處理訂單</h4>
+        <div class="value">2 <span style="font-size: 0.9rem; color: var(--text-main);">單</span></div>
+        <div style="font-size: 0.7rem; color: #b2bec3; margin-top: 5px;">(廚房動能充足)</div>
+      </div>
+    </div>
+
+    <!-- 動態分流管制設定 -->
+    <div class="control-panel">
+      <h3>⚡ AI 動態分流促銷設定</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">當其他熱門店家爆滿時，系統會主動將客流導向本店。請選擇您願意提供的吸客誘因：</p>
+      
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="promo" value="none">
+          <span>關閉分流 (不提供優惠)</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="promo" value="drink" checked>
+          <span>🎁 贈送低成本附餐 (例如：免費冰紅茶)</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="promo" value="discount">
+          <span>💰 現金折抵 (分流客每單折 5 元)</span>
+        </label>
+      </div>
+      <button class="order-btn" style="width: 100%; margin-top: 15px;" onclick="saveStoreSettings()">💾 儲存設定，開啟智慧導流</button>
+    </div>
+  </div>
+
+  <script>
+    // 簡單的視角切換邏輯
+    let isStudentView = true;
+    function toggleView() {
+      isStudentView = !isStudentView;
+      document.getElementById('studentView').classList.toggle('active', isStudentView);
+      document.getElementById('storeView').classList.toggle('active', !isStudentView);
+      document.querySelector('.view-toggle').innerText = isStudentView ? '切換至：店家後台' : '切換至：學生端';
+    }
+
+    // 模擬打 API 到 Google Apps Script
+    function submitOrder() {
+      alert('訂單已送出！已套用分流優惠。');
+      // 這裡之後可以加入 fetch(GAS_URL) 
+    }
+
+    function saveStoreSettings() {
+      alert('設定已儲存！當其他店家塞車時，AI 將優先推播本店給學生。');
+      // 這裡之後可以加入 fetch(GAS_URL)
+    }
+  </script>
+</body>
+</html>
