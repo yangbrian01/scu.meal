@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>東吳學餐 MealFlow｜學生掃碼免排隊點餐</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+  <script>window.MEALFLOW_DEFAULT_MODE = 'order';</script>
+</head>
+<body>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- 頂部導覽列 (純學生端，無店家後台按鈕) -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-title-group">
+        <a href="./" onclick="navigateToOrderMenu(); return false;" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:6px;">
+          <span style="font-size:1.35rem;">🍱</span>
+          <span style="font-weight:900; font-size:1.08rem; letter-spacing:-0.3px;">東吳學餐快點</span>
+        </a>
+        <span class="role-badge" id="headerRoleBadge">📱 掃碼免排隊點餐</span>
+        <span class="sync-status" title="點擊立即同步雲端資料" style="cursor:pointer;" onclick="syncCloud(true)">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncText">已同步</span>
+        </span>
+      </div>
+
+      <div class="campus-switcher" id="headerCampusSwitcher">
+        <button class="campus-btn active" id="btnCampus-雙溪校區" onclick="switchCampus('雙溪校區')">雙溪校區</button>
+        <button class="campus-btn" id="btnCampus-城中校區" onclick="switchCampus('城中校區')">城中校區</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ==================== 學生掃碼點餐頁 (/order/) ==================== -->
+    <section id="viewOrder" class="view-section active">
+      <!-- 若本機剛點過餐且尚未完成，顯示返回該筆專屬訂單網址的快捷條 -->
+      <div id="activeOrderFloatingBanner"></div>
+
+      <!-- AI 動態分流智慧推薦橫幅 -->
+      <div id="aiSmartTipBox"></div>
+
+      <!-- 快篩標籤 -->
+      <div class="filter-row">
+        <button class="filter-chip active" id="filter-ALL" onclick="setFilter('ALL')">全部店家</button>
+        <button class="filter-chip" id="filter-FAST" onclick="setFilter('FAST')">⚡ 免排隊快取 (綠燈順暢)</button>
+        <button class="filter-chip" id="filter-PROMO" onclick="setFilter('PROMO')">🎁 AI 分流送優惠</button>
+      </div>
+
+      <!-- 餐廳列表 -->
+      <div id="storeListContainer" class="store-list"></div>
+    </section>
+
+    <!-- ==================== 專屬訂單追蹤頁 (/order/?id=ORD-8f92a1c4...) ==================== -->
+    <section id="viewTicket" class="view-section">
+      <div id="singleTicketContainer"></div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 菜單點餐抽屜 Modal ==================== -->
+  <div id="menuModal" class="modal-backdrop" onclick="if(event.target===this) closeMenuModal()">
+    <div class="menu-sheet">
+      <div class="sheet-header">
+        <div>
+          <h3 style="font-size:1.15rem; font-weight:800;" id="sheetStoreName">店家名稱</h3>
+          <div style="font-size:0.8rem; color:var(--text-secondary);" id="sheetStoreMeta">預計等候 5 分鐘</div>
+        </div>
+        <button class="sheet-close" onclick="closeMenuModal()">✕</button>
+      </div>
+
+      <div class="sheet-body">
+        <div id="sheetPromoBanner" style="display:none; background:var(--brand-light); color:var(--brand-dark); padding:10px 12px; border-radius:10px; font-size:0.84rem; font-weight:700; margin-bottom:12px;"></div>
+        <div id="sheetCongestedWarning" style="display:none; background:var(--red-bg); color:var(--red); padding:10px 12px; border-radius:10px; font-size:0.82rem; font-weight:700; margin-bottom:12px;"></div>
+        
+        <div id="sheetMenuContainer"></div>
+
+        <div class="checkout-options">
+          <div>
+            <label class="field-label">⏰ 取餐時段</label>
+            <select id="pickupSlotSelect" class="select-input">
+              <option value="立即製作">⚡ 立即製作</option>
+              <option value="12:10 下課取餐">12:10 下課取餐</option>
+              <option value="12:25 預約取餐">12:25 預約取餐</option>
+              <option value="13:00 離峰取餐">13:00 離峰取餐</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">💳 付款方式</label>
+            <select id="paymentSelect" class="select-input">
+              <option value="LINE Pay">LINE Pay</option>
+              <option value="現場現金付款">現場現金付款</option>
+              <option value="街口支付">街口支付</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet-footer">
+        <div>
+          <div style="font-size:0.76rem; color:var(--text-secondary);">總計金額 <span id="sheetDiscountNote" style="color:var(--brand); font-weight:700;"></span></div>
+          <div style="font-size:1.4rem; font-weight:900;" id="sheetTotalPrice">$0</div>
+        </div>
+        <button class="btn-submit-order" id="submitOrderBtn" onclick="placeOrder()">送出預訂・領取餐號</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../app.js"></script>
+</body>
+</html>
