@@ -13,6 +13,8 @@
 <body>
 
   <div id="toast" class="toast"></div>
+  <!-- LINE 即時推播通知懸浮容器 -->
+  <div id="linePushContainer" class="line-push-container"></div>
 
   <!-- 頂部導覽列 -->
   <header class="app-header">
@@ -29,9 +31,14 @@
         </span>
       </div>
 
-      <div class="campus-switcher" id="headerCampusSwitcher">
-        <button class="campus-btn active" id="btnCampus-雙溪校區" onclick="switchCampus('雙溪校區')">雙溪校區</button>
-        <button class="campus-btn" id="btnCampus-城中校區" onclick="switchCampus('城中校區')">城中校區</button>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn-line" style="padding:5px 11px; font-size:0.76rem;" onclick="openLineBindModal()">
+          <span id="headerLineBtnText">💬 綁定 LINE 通知</span>
+        </button>
+        <div class="campus-switcher" id="headerCampusSwitcher">
+          <button class="campus-btn active" id="btnCampus-雙溪校區" onclick="switchCampus('雙溪校區')">雙溪校區</button>
+          <button class="campus-btn" id="btnCampus-城中校區" onclick="switchCampus('城中校區')">城中校區</button>
+        </div>
       </div>
     </div>
   </header>
@@ -67,7 +74,7 @@
           </div>
 
           <div style="display:flex; gap:8px; margin-top:4px;">
-            <input type="text" id="aiUserQueryInput" class="select-input" style="flex:1; background:rgba(255,255,255,0.95); border:none;" placeholder="輸入你的需求（例：想吃烏龍麵或水餃、不想等超過5分鐘）...">
+            <input type="text" id="aiUserQueryInput" class="select-input" style="flex:1; background:rgba(255,255,255,0.95); border:none;" placeholder="輸入你的需求（例：想吃烏龍麵或水餃、不想等超過5分鐘）..." onkeydown="if(event.key==='Enter') askAiConcierge()">
             <button type="button" class="btn-tip-action" onclick="askAiConcierge()">🧠 AI 分析推薦</button>
           </div>
 
@@ -103,13 +110,35 @@
     <div class="floating-cart-inner">
       <button type="button" id="viewCartBtn" class="btn-view-cart" onclick="openCartModal()" disabled>
         <span id="cartItemCountBadge" class="cart-count-pill">0 份</span>
-        <span>🛒 查看購物車・選取餐方式</span>
+        <span>🛒 查看購物車・選取餐與預訂時間</span>
         <span id="cartPreviewTotal" style="font-size:1.2rem; font-weight:900;">NT$ 0</span>
       </button>
     </div>
   </div>
 
-  <!-- ==================== 彈窗 1：餐點客製化選項 Modal (`optionsModal`) ==================== -->
+  <!-- ==================== 彈窗 A：購物車抽屜 Modal (`#cartModal`, z-index: 8000) ==================== -->
+  <div id="cartModal" class="modal-overlay bottom-sheet" onclick="if(event.target===this) closeCartModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 style="font-size:1.3rem; font-weight:900; display:flex; align-items:center; gap:8px;">
+          <span>🛒</span> 確認購物車明細與預訂設定
+        </h2>
+        <button type="button" onclick="closeCartModal()" style="border:none; background:#F3F4F6; width:36px; height:36px; border-radius:50%; font-size:1.2rem; font-weight:900;">✕</button>
+      </div>
+      <div class="modal-body" style="background:var(--bg-page);" id="cartPageList"></div>
+      <div class="modal-footer">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span style="font-size:1.05rem; font-weight:800;">應付總計金額</span>
+          <span id="cartModalTotal" style="font-size:1.55rem; font-weight:900; color:var(--red);">NT$ 0</span>
+        </div>
+        <button type="button" id="finalSubmitOrderBtn" class="btn-tip-action" style="width:100%; padding:15px; font-size:1.05rem;" onclick="submitStudentCartOrder()">
+          確認餐點並送出訂單
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 B：餐點客製化選項 Modal (`#optionsModal`, z-index: 9500，確保在結帳抽屜最上層開啟) ==================== -->
   <div id="optionsModal" class="modal-overlay" onclick="if(event.target===this) closeOptionsModal()">
     <div class="modal-card">
       <div class="modal-header">
@@ -128,25 +157,57 @@
     </div>
   </div>
 
-  <!-- ==================== 彈窗 2：購物車抽屜 Modal (`cartModal`) ==================== -->
-  <div id="cartModal" class="modal-overlay bottom-sheet" onclick="if(event.target===this) closeCartModal()">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2 style="font-size:1.3rem; font-weight:900; display:flex; align-items:center; gap:8px;">
-          <span>🛒</span> 確認購物車明細
-        </h2>
-        <button type="button" onclick="closeCartModal()" style="border:none; background:#F3F4F6; width:36px; height:36px; border-radius:50%; font-size:1.2rem; font-weight:900;">✕</button>
-      </div>
-      <div class="modal-body" style="background:var(--bg-page);" id="cartPageList"></div>
-      <div class="modal-footer">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <span style="font-size:1.05rem; font-weight:800;">應付總計金額</span>
-          <span id="cartModalTotal" style="font-size:1.55rem; font-weight:900; color:var(--red);">NT$ 0</span>
+  <!-- ==================== 彈窗 E：💚 LINE 官方帳號綁定與即時通知中心 (`#lineBindModal`) ==================== -->
+  <div id="lineBindModal" class="modal-overlay" onclick="if(event.target===this) closeLineBindModal()">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-header" style="background:#06C755; color:#FFFFFF;">
+        <div>
+          <span style="font-size:0.7rem; font-weight:800; background:rgba(255,255,255,0.22); padding:2px 8px; border-radius:999px;">LINE Official Notification Center</span>
+          <h3 style="font-size:1.15rem; font-weight:900; margin-top:3px;">💬 綁定 LINE 接收取餐與預訂提醒</h3>
         </div>
-        <button type="button" id="finalSubmitOrderBtn" class="btn-tip-action" style="width:100%; padding:15px; font-size:1.05rem;" onclick="submitStudentCartOrder()">
-          確認餐點並送出訂單
-        </button>
+        <button type="button" onclick="closeLineBindModal()" style="border:none; background:rgba(255,255,255,0.22); color:#fff; width:32px; height:32px; border-radius:50%; font-weight:900;">✕</button>
       </div>
+      <div class="modal-body">
+        <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:12px;">
+          綁定後，當<strong>餐點製作完成可取餐</strong>、<strong>超過 2 天之預訂單需至櫃檯繳費提醒</strong>、<strong>訂單完成或逾期取消</strong>時，系統皆會自動推播通知！
+        </p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+          <div>
+            <label class="field-label">👤 您的 LINE 顯示暱稱</label>
+            <input type="text" id="lineInputName" class="select-input" placeholder="例如：王小明">
+          </div>
+          <div>
+            <label class="field-label">🆔 LINE ID / 學號綁定碼</label>
+            <input type="text" id="lineInputId" class="select-input" placeholder="例如：@scu_ming">
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label class="field-label">🔗 選填：自訂 LINE Notify / Webhook 轉發網址</label>
+          <input type="text" id="lineInputWebhook" class="select-input" placeholder="留空即使用內建模擬推播視窗">
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <button type="button" class="btn-line" style="flex:1; justify-content:center; padding:11px;" onclick="saveLineBindConfig()">
+            💚 一鍵完成綁定並發送測試通知
+          </button>
+          <button type="button" class="filter-chip" onclick="requestBrowserNotificationPermission()">
+            🔔 開啟手機背景通知權限
+          </button>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <strong style="font-size:0.86rem; color:#166534;">📬 最近 LINE 推播通知紀錄匣</strong>
+          <button type="button" onclick="unbindLineAccount()" style="border:none; background:transparent; color:var(--text-muted); font-size:0.74rem; text-decoration:underline;">解除綁定</button>
+        </div>
+        <div id="lineLogsContainer" style="max-height:180px; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈窗 F：🔔 學生取餐手機震動與響鈴全螢幕強提醒 (`#pickupAlertModal`) ==================== -->
+  <div id="pickupAlertModal" class="modal-overlay" onclick="if(event.target===this) closePickupAlertModal()">
+    <div class="modal-card" style="max-width:400px; border:3px solid var(--green);">
+      <div class="modal-body" id="pickupAlertContent"></div>
     </div>
   </div>
 
