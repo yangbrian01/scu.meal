@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>東吳學餐 MealFlow｜校園 AI 免排隊預訂管制塔</title>
+  <title>東吳學餐 MealFlow｜校園 AI 免排隊預訂與 POS 管制塔</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -44,8 +44,35 @@
 
     <!-- ==================== 路由 2：學生掃碼點餐頁 (/order/) ==================== -->
     <section id="viewOrder" class="view-section">
-      <!-- 若本機剛點過餐且尚未完成，顯示返回該筆專屬訂單網址的快捷條 -->
+      <!-- 只有當這台裝置剛剛真的送出過訂單，才會顯示返回該筆亂碼訂單網址的浮條 -->
       <div id="activeOrderFloatingBanner"></div>
+
+      <!-- 真 AI 智慧選餐顧問 (Gemini 2.5 Flash + M/M/1 Queueing Utility Engine) -->
+      <div class="ai-concierge-box">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <div>
+            <span style="font-size:0.72rem; font-weight:800; background:rgba(255,255,255,0.18); padding:2px 8px; border-radius:999px;">
+              ✨ MealFlow AI 選餐顧問
+            </span>
+            <h3 style="font-size:1rem; font-weight:800; margin-top:4px;">不知道吃什麼？讓 AI 依即時排隊佇列幫你配餐</h3>
+          </div>
+          <button type="button" class="ai-prompt-chip" onclick="promptGeminiKeyConfig()" title="設定 Google Gemini API Key">⚙️ AI 引擎設定</button>
+        </div>
+
+        <div class="ai-chip-row">
+          <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('⚡ 我只剩 10 分鐘就要上課，推薦最快拿到的主餐')">⚡ 10分鐘內趕上課快取</button>
+          <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('💰 預算 $100 元以內、有分流優惠的最高 CP 值正餐')">💰 預算 $100 內最高 CP 值</button>
+          <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('🌶️ 想吃韓式、椒麻或辣味重口味，且不用排隊的餐點')">🌶️ 想吃辣味重口味免排隊</button>
+          <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('🥩 剛運動完想吃大份量肉類補充蛋白質')">🥩 大份量高蛋白肉食</button>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:4px;">
+          <input type="text" id="aiUserQueryInput" class="select-input" style="flex:1; background:rgba(255,255,255,0.95); border:none;" placeholder="輸入你的需求（例：想吃烏龍麵或湯品、不想等超過5分鐘）...">
+          <button type="button" class="btn-tip-action" onclick="askAiConcierge()">🧠 AI 分析推薦</button>
+        </div>
+
+        <div id="aiConciergeResponse" class="ai-response-card"></div>
+      </div>
 
       <!-- AI 動態分流智慧推薦橫幅 -->
       <div id="aiSmartTipBox"></div>
@@ -66,96 +93,121 @@
       <div id="singleTicketContainer"></div>
     </section>
 
-    <!-- ==================== 路由 4：店家接單與分流設定 (/store/) ==================== -->
+    <!-- ==================== 路由 4：店家櫃檯 POS + 廚房 KDS 後台 (/store/) ==================== -->
     <section id="viewStore" class="view-section">
       <!-- 店家端專屬：評審 Demo 流量模擬器 -->
       <div class="demo-sim-bar">
-        <div style="font-size:0.82rem; font-weight:800; color:#FBBF24;">
-          ⚡ 黑客松評審 Demo 流量模擬器：
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span style="font-size:0.82rem; font-weight:800; color:#FBBF24;">⚡ 評審 Demo 流量模擬：</span>
           <button class="demo-btn peak" onclick="triggerTrafficSim('PEAK')">🔥 模擬 12:10 尖峰塞車</button>
           <button class="demo-btn" onclick="triggerTrafficSim('NORMAL')">🌿 恢復離峰順暢</button>
         </div>
-      </div>
-
-      <div class="merchant-box" style="background:#FFF3EE; border-color:#FED7AA;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-          <div>
-            <div style="font-size:0.76rem; font-weight:800; color:var(--brand);">店家專屬接單與 AI 分流控制台 (/store/)</div>
-            <h2 style="font-size:1.15rem; font-weight:800;">離峰開啟優惠吸客・語音自動讀單</h2>
-          </div>
-          <select id="merchantSelect" class="select-input" style="width:auto;" onchange="onMerchantStoreChange()"></select>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:0.78rem; color:#D1D5DB;">當前管理店家：</span>
+          <select id="merchantSelect" class="select-input" style="width:auto; padding:5px 10px;" onchange="onMerchantStoreChange()"></select>
         </div>
       </div>
 
-      <!-- 店家 3 秒切換分流優惠 & 產能微調 -->
-      <div class="merchant-box">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
-          <h3 style="font-size:0.98rem; font-weight:800;">🎁 當同校區友店塞車時，本店提供的 AI 分流優惠：</h3>
-          <span style="font-size:0.78rem; color:var(--brand-dark); font-weight:700;" id="merchPredictLabel">🤖 AI 今日備料預測：165 份</span>
-        </div>
+      <!-- 店家雙模式切換：1. 櫃檯 POS 現場點餐收銀  2. 廚房 KDS 出單與 AI 分流控制台 -->
+      <div class="store-mode-tabs">
+        <button type="button" class="store-mode-btn active" id="tabBtnStorePos" onclick="switchStoreTabMode('pos')">
+          🖥️ 櫃檯 POS 現場點餐收銀（幫現場客點餐）
+        </button>
+        <button type="button" class="store-mode-btn" id="tabBtnStoreKds" onclick="switchStoreTabMode('kds')">
+          👨‍🍳 廚房 KDS 接單佇列 (<span id="kdsPendingBadge">0</span>) & AI 分流設定
+        </button>
+      </div>
 
-        <div class="promo-pills">
-          <button class="promo-pill-btn" id="pBtn-none" onclick="setMerchantPromo('none')">
-            <div style="font-weight:800; font-size:0.88rem;">⏸️ 暫不提供優惠</div>
-            <div style="font-size:0.75rem; color:var(--text-secondary);">現場滿載忙碌時關閉</div>
-          </button>
-          <button class="promo-pill-btn" id="pBtn-gift" onclick="setMerchantPromo('gift')">
-            <div style="font-weight:800; font-size:0.88rem; color:var(--brand);">🎁 免費招待附餐/飲品</div>
-            <div style="font-size:0.75rem; color:var(--text-secondary);">低食材成本・高分流吸引力</div>
-          </button>
-          <button class="promo-pill-btn" id="pBtn-discount" onclick="setMerchantPromo('discount')">
-            <div style="font-weight:800; font-size:0.88rem; color:var(--green);">💰 每單現折 $10 元</div>
-            <div style="font-size:0.75rem; color:var(--text-secondary);">直接折現吸引猶豫學生</div>
-          </button>
-          <button class="promo-pill-btn" id="pBtn-points" onclick="setMerchantPromo('points')">
-            <div style="font-weight:800; font-size:0.88rem; color:var(--amber);">⚡ 贈送雙倍 MealPoints</div>
-            <div style="font-size:0.75rem; color:var(--text-secondary);">不折損毛利・提升回購率</div>
-          </button>
-        </div>
-
-        <div class="capacity-controls">
+      <!-- 子面板 A：櫃檯 POS 現場快速點餐收銀機 -->
+      <div id="storePosPanel">
+        <div class="pos-workspace">
           <div>
-            <label class="field-label">🍳 目前待製單數 (activeOrders)</label>
-            <input type="number" id="merchActiveInput" class="select-input" min="0" max="99" value="4">
+            <div style="font-size:0.84rem; font-weight:800; color:var(--text-secondary); margin-bottom:8px;">
+              👇 點擊菜色方塊立即加入右側櫃檯收銀單：
+            </div>
+            <div id="posMenuGrid" class="pos-menu-grid"></div>
           </div>
-          <div>
-            <label class="field-label">⚙️ 每 15 分鐘最大產能上限</label>
-            <input type="number" id="merchCapInput" class="select-input" min="5" max="100" value="20">
-          </div>
-        </div>
-
-        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
-          <input type="text" id="merchCustomText" class="select-input" style="flex:1; min-width:200px;" placeholder="輸入分流優惠顯示文案">
-          <button class="btn-tip-action" id="btnSaveMerchant" onclick="saveMerchantPromo()">💾 儲存並同步雲端</button>
+          <div id="posTicketBox" class="pos-ticket-panel"></div>
         </div>
       </div>
 
-      <!-- 店家目前待製作訂單 -->
-      <div class="merchant-box">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-          <h3 style="font-size:0.98rem; font-weight:800;">📋 即時廚房訂單佇列 (<span id="merchActiveCount">0</span> 筆進行中)</h3>
-          <div style="display:flex; gap:8px;">
-            <button class="filter-chip" onclick="syncCloud(true)">🔄 刷新訂單</button>
-            <button class="filter-chip" onclick="speakSample()">🔊 測試語音讀單</button>
+      <!-- 子面板 B：廚房 KDS 出單佇列 & AI 優惠設定 -->
+      <div id="storeKdsPanel" style="display:none;">
+        <!-- 店家目前待製作訂單 -->
+        <div class="merchant-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h3 style="font-size:1rem; font-weight:800;">📋 即時廚房訂單佇列 (<span id="merchActiveCount">0</span> 筆進行中｜含掃碼預訂與櫃檯 POS 單)</h3>
+            <div style="display:flex; gap:8px;">
+              <button class="filter-chip" onclick="syncCloud(true)">🔄 刷新訂單</button>
+              <button class="filter-chip" onclick="speakSample()">🔊 測試語音讀單</button>
+            </div>
+          </div>
+          <div id="merchantOrderList"></div>
+        </div>
+
+        <!-- 店家 3 秒切換分流優惠 & 產能微調 -->
+        <div class="merchant-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+            <h3 style="font-size:0.98rem; font-weight:800;">🎁 當同校區友店塞車時，本店提供的 AI 分流優惠：</h3>
+            <span style="font-size:0.78rem; color:var(--brand-dark); font-weight:700;" id="merchPredictLabel">🧠 AI 佇列推算載入中...</span>
+          </div>
+
+          <div class="promo-pills">
+            <button class="promo-pill-btn" id="pBtn-none" onclick="setMerchantPromo('none')">
+              <div style="font-weight:800; font-size:0.88rem;">⏸️ 暫不提供優惠</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">現場滿載忙碌時關閉</div>
+            </button>
+            <button class="promo-pill-btn" id="pBtn-gift" onclick="setMerchantPromo('gift')">
+              <div style="font-weight:800; font-size:0.88rem; color:var(--brand);">🎁 免費招待附餐/飲品</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">低食材成本・高分流吸引力</div>
+            </button>
+            <button class="promo-pill-btn" id="pBtn-discount" onclick="setMerchantPromo('discount')">
+              <div style="font-weight:800; font-size:0.88rem; color:var(--green);">💰 每單現折 $10 元</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">直接折現吸引猶豫學生</div>
+            </button>
+            <button class="promo-pill-btn" id="pBtn-points" onclick="setMerchantPromo('points')">
+              <div style="font-weight:800; font-size:0.88rem; color:var(--amber);">⚡ 贈送雙倍 MealPoints</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary);">不折損毛利・提升回購率</div>
+            </button>
+          </div>
+
+          <div class="capacity-controls">
+            <div>
+              <label class="field-label">🍳 目前待製單數 (activeOrders)</label>
+              <input type="number" id="merchActiveInput" class="select-input" min="0" max="99" value="4">
+            </div>
+            <div>
+              <label class="field-label">⚙️ 每 15 分鐘最大產能上限</label>
+              <input type="number" id="merchCapInput" class="select-input" min="5" max="100" value="20">
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <input type="text" id="merchCustomText" class="select-input" style="flex:1; min-width:200px;" placeholder="輸入分流優惠顯示文案">
+            <button class="btn-tip-action" id="btnSaveMerchant" onclick="saveMerchantPromo()">💾 儲存並同步雲端</button>
           </div>
         </div>
-        <div id="merchantOrderList"></div>
       </div>
     </section>
 
   </main>
 
-  <!-- ==================== 菜單點餐抽屜 Modal ==================== -->
+  <!-- ==================== 商用菜單點餐抽屜 Modal ==================== -->
   <div id="menuModal" class="modal-backdrop" onclick="if(event.target===this) closeMenuModal()">
     <div class="menu-sheet">
       <div class="sheet-header">
         <div>
           <h3 style="font-size:1.15rem; font-weight:800;" id="sheetStoreName">店家名稱</h3>
-          <div style="font-size:0.8rem; color:var(--text-secondary);" id="sheetStoreMeta">預計等候 5 分鐘</div>
+          <div style="font-size:0.78rem; color:var(--text-secondary);" id="sheetStoreMeta">預計等候 5 分鐘</div>
         </div>
         <button class="sheet-close" onclick="closeMenuModal()">✕</button>
+      </div>
+
+      <!-- 菜單分類切換列 -->
+      <div class="menu-cat-bar">
+        <button type="button" class="cat-tab active" id="catTab-ALL" onclick="setMenuCatFilter('ALL')">📋 全部餐點</button>
+        <button type="button" class="cat-tab" id="catTab-主餐" onclick="setMenuCatFilter('主餐')">🍱 招牌主餐系列</button>
+        <button type="button" class="cat-tab" id="catTab-小食/湯飲" onclick="setMenuCatFilter('小食/湯飲')">🥟 單點小菜與湯飲</button>
       </div>
 
       <div class="sheet-body">
@@ -166,7 +218,7 @@
 
         <div class="checkout-options">
           <div>
-            <label class="field-label">⏰ 取餐時段</label>
+            <label class="field-label">⏰ 預計取餐時段</label>
             <select id="pickupSlotSelect" class="select-input">
               <option value="立即製作">⚡ 立即製作</option>
               <option value="12:10 下課取餐">12:10 下課取餐</option>
@@ -175,11 +227,12 @@
             </select>
           </div>
           <div>
-            <label class="field-label">💳 付款方式</label>
+            <label class="field-label">💳 結帳付款方式</label>
             <select id="paymentSelect" class="select-input">
               <option value="LINE Pay">LINE Pay</option>
               <option value="現場現金付款">現場現金付款</option>
               <option value="街口支付">街口支付</option>
+              <option value="Apple Pay">Apple Pay</option>
             </select>
           </div>
         </div>
@@ -187,10 +240,13 @@
 
       <div class="sheet-footer">
         <div>
-          <div style="font-size:0.76rem; color:var(--text-secondary);">總計金額 <span id="sheetDiscountNote" style="color:var(--brand); font-weight:700;"></span></div>
+          <div style="font-size:0.74rem; color:var(--text-secondary);">應付總計 <span id="sheetDiscountNote" style="color:var(--brand); font-weight:700;"></span></div>
           <div style="font-size:1.4rem; font-weight:900;" id="sheetTotalPrice">$0</div>
         </div>
-        <button class="btn-submit-order" id="submitOrderBtn" onclick="placeOrder()">送出預訂・領取餐號</button>
+        <button class="btn-submit-order" id="submitOrderBtn" onclick="placeOrder()">
+          <span>🛒 確認送出預訂</span>
+          <span>領取餐號 ➔</span>
+        </button>
       </div>
     </div>
   </div>
