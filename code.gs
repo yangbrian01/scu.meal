@@ -1,21 +1,19 @@
 /**
- * MealFlow 學餐 AI 流量管制塔 - 企業級後端引擎 (Google Apps Script v4.0)
- * 整合：
- * 1. M/M/1 佇列理論等待時間推論模型與多維度效用評分 (Utility Scoring)
- * 2. Google Gemini API (gemini-2.5-flash) 生成式 AI 選餐顧問與店家動態分流策略分析
- * 3. 支援學生掃碼點餐 (/order/)、專屬亂碼訂單憑證 (?id=ORD-xxx) 與店家櫃檯 POS + 廚房 KDS (/store/)
+ * MealFlow 學餐 AI 流量管制塔 - 企業級後端引擎 (Google Apps Script v5.0)
+ * 新增與強化：
+ * 1. 真實菜單資料庫 CRUD (`saveStoreMenus`)：支援店家新增/修改/刪除餐點、分類、八方模式、客製化選項群組 (optionsJson)
+ * 2. AI 智慧菜單視覺辨識與結構化匯入 (`aiParseMenu`)：支援上傳菜單圖片 (Base64) 或文字，透過 Gemini 2.5 Flash 多模態模型自動擷取全菜單
+ * 3. AI 選餐顧問 (`askAiConcierge`) + M/M/1 佇列動態分流模型
  */
 
 const SHEET_ID = '14SaczmfdgXx9t4WfoSBrD_8gs7wzdCcNrsroT0bvzok';
-const DB_VERSION = 'v4.0_init_done';
-
-// 若有 Google AI Studio 的 Gemini API Key，可填入此處或存入 ScriptProperties 的 'GEMINI_API_KEY'
+const DB_VERSION = 'v5.0_init_done';
 const DEFAULT_GEMINI_API_KEY = '';
 
 function doGet(e) {
   return ContentService.createTextOutput(JSON.stringify({
     success: true,
-    service: 'MealFlow AI Engine v4.0 (Queueing Model + Gemini LLM)',
+    service: 'MealFlow AI Engine v5.0 (Real Menu CRUD + AI Vision Menu Scanner + Queueing Model)',
     status: 'ONLINE'
   })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -52,6 +50,12 @@ function doPost(e) {
       case 'updateStoreConfig':
         result = updateStoreSettings(ss, params);
         break;
+      case 'saveStoreMenus':
+        result = saveStoreMenusToSheet(ss, params);
+        break;
+      case 'aiParseMenu':
+        result = handleAiMenuScan(ss, params);
+        break;
       case 'updateOrderStatus':
         result = updateOrderState(ss, params);
         break;
@@ -80,27 +84,18 @@ function doPost(e) {
   }
 }
 
-/**
- * M/M/1 佇列模型與非線性負載推算預估等待時間（分鐘）
- * 考慮店家每 15 分鐘產能服務率 μ = maxCap / 15 (單/分鐘)
- */
 function calcPrepMinutes(activeOrders, maxCap) {
   const cap = Math.max(5, Number(maxCap) || 20);
   const act = Math.max(0, Number(activeOrders) || 0);
-  const serviceRatePerMin = cap / 15; // 每分鐘出餐產能 μ
-  const loadRatio = act / cap;        // 負載率 ρ
+  const serviceRatePerMin = cap / 15;
+  const loadRatio = act / cap;
   if (act <= 1) return 3;
-  // Little's Law 基礎排隊時間 (act / μ) + 高負載時的非線性壅塞懲罰項
   const queueTime = act / serviceRatePerMin;
   const congestionPenalty = loadRatio >= 0.85 ? Math.pow((loadRatio - 0.75) * 10, 1.5) : 0;
   const est = Math.round(2 + queueTime * 0.85 + congestionPenalty);
   return Math.max(3, Math.min(45, est));
 }
 
-/**
- * 計算店家的 AI 綜合推薦效用分數 (0 ~ 99 分)
- * 結合：時間節省權重 (55%)、優惠價值權重 (25%)、顧客評分權重 (20%)
- */
 function calcAiUtilityScore(store) {
   const waitScore = Math.max(0, 100 - (Number(store.avgPrepMinutes) || 5) * 3.4);
   let promoBonus = 0;
@@ -113,7 +108,7 @@ function calcAiUtilityScore(store) {
 }
 
 /**
- * 自動初始化資料庫結構（若空白則塞入東吳雙溪與城中校區完整菜單資料）
+ * 自動初始化資料庫結構（Menus 支援 category, isBafangMode, image, optionsJson）
  */
 function ensureDatabaseInitialized(ss, forceCheck) {
   const props = PropertiesService.getScriptProperties();
@@ -144,31 +139,45 @@ function ensureDatabaseInitialized(ss, forceCheck) {
   let menuSheet = ss.getSheetByName('Menus');
   if (!menuSheet) {
     menuSheet = ss.insertSheet('Menus');
-    menuSheet.appendRow(['id', 'storeId', 'name', 'price', 'prepTime', 'tag', 'available']);
+    menuSheet.appendRow(['id', 'storeId', 'name', 'price', 'prepTime', 'tag', 'available', 'category', 'isBafangMode', 'image', 'optionsJson']);
+    const stdRiceOpts = JSON.stringify({
+      '主食份量': { type: 'radio', choices: [['正常飯量', 0], ['飯少(減醣)', 0], ['大盛加飯', 10]] },
+      '辣度選擇': { type: 'radio', choices: [['不辣', 0], ['小辣', 0], ['中辣', 0]] },
+      '人氣加購': { type: 'checkbox', choices: [['加香濃起司', 15], ['加溏心溫泉蛋', 15], ['不要蔥花', 0]] }
+    });
+    const dumplingOpts = JSON.stringify({
+      '選擇顆數': { type: 'radio', choices: [['8顆', 56], ['10顆', 70], ['12顆', 84], ['15顆', 105]] },
+      '醬料選擇': { type: 'checkbox', choices: [['蒜泥醬油', 0], ['特製辣油', 0], ['不要醬料', 0]] }
+    });
     const defaultMenus = [
-      ['M01', 'S01', '特製韓式泡菜燒肉飯捲', 75, 4, '🔥 必點人氣', true],
-      ['M02', 'S01', '起司炸蝦海苔飯捲', 85, 5, '⭐ 主廚推薦', true],
-      ['M03', 'S01', '經典鮪魚玉米飯捲', 65, 3, '⚡ 快速出餐', true],
-      ['M18', 'S01', '韓式魚板蘿蔔湯', 35, 2, '🥣 暖胃湯品', true],
-      ['M04', 'S02', '炙燒起司牛五花丼', 115, 4, '🔥 招牌必點', true],
-      ['M05', 'S02', '黃金厚切豬排滑蛋丼', 120, 5, '⭐ 飽足首選', true],
-      ['M06', 'S02', '讚岐胡麻冷烏龍麵', 95, 3, '⚡ 3分極速出餐', true],
-      ['M19', 'S02', '日式唐揚炸雞 (單點)', 55, 3, '🍗 人氣加點', true],
-      ['M07', 'S03', '招牌鍋貼套餐 (10顆+酸辣湯)', 105, 5, '🔥 經典組合', true],
-      ['M08', 'S03', '高麗菜水餃 (12顆)', 78, 4, '⚡ 快速出餐', true],
-      ['M20', 'S03', '冰鎮無糖豆漿', 25, 1, '🥤 清涼飲品', true],
-      ['M09', 'S04', '秘製椒麻雞腿飯', 110, 4, '🔥 銷量冠軍', true],
-      ['M10', 'S04', '蒜泥白肉精緻便當', 100, 3, '⚡ 極速便當', true],
-      ['M21', 'S04', '脆皮炸豆腐', 40, 2, '✨ 招牌小菜', true],
-      ['M11', 'S05', '唐揚炸雞熟成咖哩飯', 125, 6, '🔥 排隊人氣', true],
-      ['M12', 'S05', '手打漢堡排歐姆蛋咖哩', 135, 7, '⭐ 限量供應', true],
-      ['M13', 'S06', '蔥爆牛肉鐵板簡餐', 115, 4, '🔥 現點現做', true],
-      ['M14', 'S06', '古早味排骨特餐', 105, 3, '⚡ 4分極速取餐', true],
-      ['M15', 'S06', '手工鮮蝦紅油抄手麵', 90, 3, '⭐ 學生最愛', true],
-      ['M16', 'S07', '川味麻辣雞絲涼麵 (大)', 75, 2, '⚡ 2分秒取', true],
-      ['M17', 'S07', '綜合三合一味噌湯 (貢丸+蛋花)', 45, 2, '🔥 絕配湯品', true]
+      ['M01', 'S01', '特製韓式泡菜燒肉飯捲', 75, 4, '🔥 必點人氣', true, '韓式飯捲', false, '', stdRiceOpts],
+      ['M02', 'S01', '起司炸蝦海苔飯捲', 85, 5, '⭐ 主廚推薦', true, '韓式飯捲', false, '', stdRiceOpts],
+      ['M03', 'S01', '經典鮪魚玉米飯捲', 65, 3, '⚡ 快速出餐', true, '韓式飯捲', false, '', stdRiceOpts],
+      ['M18', 'S01', '韓式魚板蘿蔔湯', 35, 2, '🥣 暖胃湯品', true, '暖胃湯飲', false, '', '{}'],
+      ['M04', 'S02', '炙燒起司牛五花丼', 115, 4, '🔥 招牌必點', true, '日式蓋飯', false, '', stdRiceOpts],
+      ['M05', 'S02', '黃金厚切豬排滑蛋丼', 120, 5, '⭐ 飽足首選', true, '日式蓋飯', false, '', stdRiceOpts],
+      ['M06', 'S02', '讚岐胡麻冷烏龍麵', 95, 3, '⚡ 3分極速出餐', true, '讚岐烏龍', false, '', stdRiceOpts],
+      ['M19', 'S02', '日式唐揚炸雞 (5塊)', 55, 3, '🍗 人氣單點', true, '單點炸物', false, '', '{}'],
+      ['M07', 'S03', '招牌脆皮鍋貼', 7, 5, '🔥 按顆計價', true, '手工鍋貼水餃', true, '', dumplingOpts],
+      ['M08', 'S03', '高麗菜鮮肉水餃', 7, 4, '⚡ 按顆計價', true, '手工鍋貼水餃', true, '', dumplingOpts],
+      ['M20', 'S03', '酸辣湯 / 無糖豆漿', 30, 1, '🥣 湯品飲品', true, '湯品飲品', false, '', JSON.stringify({'品項選擇': {type:'radio', choices:[['招牌酸辣湯',0],['冰鎮無糖豆漿',-5]]}})],
+      ['M09', 'S04', '秘製椒麻雞腿飯', 110, 4, '🔥 銷量冠軍', true, '精緻特餐便當', false, '', stdRiceOpts],
+      ['M10', 'S04', '蒜泥白肉精緻便當', 100, 3, '⚡ 極速便當', true, '精緻特餐便當', false, '', stdRiceOpts],
+      ['M11', 'S05', '唐揚炸雞熟成咖哩飯', 125, 6, '🔥 排隊人氣', true, '熟成咖哩', false, '', stdRiceOpts],
+      ['M12', 'S05', '手打漢堡排歐姆蛋咖哩', 135, 7, '⭐ 限量供應', true, '熟成咖哩', false, '', stdRiceOpts],
+      ['M13', 'S06', '蔥爆牛肉鐵板簡餐', 115, 4, '🔥 現點現做', true, '台式簡餐', false, '', stdRiceOpts],
+      ['M14', 'S06', '古早味排骨特餐', 105, 3, '⚡ 4分極速取餐', true, '台式簡餐', false, '', stdRiceOpts],
+      ['M15', 'S06', '手工鮮蝦紅油抄手麵', 90, 3, '⭐ 學生最愛', true, '特色麵食', false, '', stdRiceOpts],
+      ['M16', 'S07', '川味麻辣雞絲涼麵 (大)', 75, 2, '⚡ 2分秒取', true, '手工涼麵', false, '', stdRiceOpts],
+      ['M17', 'S07', '綜合三合一味噌湯 (貢丸+蛋花)', 45, 2, '🔥 絕配湯品', true, '招牌湯品', false, '', '{}']
     ];
     defaultMenus.forEach(r => menuSheet.appendRow(r));
+  } else {
+    // 確保舊版 Menus 表頭擁有新增的擴充欄位
+    const headers = menuSheet.getRange(1, 1, 1, menuSheet.getLastColumn()).getValues()[0];
+    if (headers.indexOf('optionsJson') === -1) {
+      menuSheet.getRange(1, 8, 1, 4).setValues([['category', 'isBafangMode', 'image', 'optionsJson']]);
+    }
   }
 
   let orderSheet = ss.getSheetByName('Orders');
@@ -185,7 +194,7 @@ function ensureDatabaseInitialized(ss, forceCheck) {
 }
 
 /**
- * 取得完整前台與後台資料包 (搭配 M/M/1 佇列模型與多目標效用評分)
+ * 取得完整前台與後台資料包
  */
 function getInitBundle(ss, params) {
   let storeSheet = ss.getSheetByName('Stores');
@@ -194,8 +203,27 @@ function getInitBundle(ss, params) {
     storeSheet = ss.getSheetByName('Stores');
   }
   const stores = sheetToObjects(storeSheet);
-  const menus = sheetToObjects(ss.getSheetByName('Menus'));
+  const rawMenus = sheetToObjects(ss.getSheetByName('Menus'));
   const orders = sheetToObjects(ss.getSheetByName('Orders')).reverse();
+
+  const parsedMenus = rawMenus.filter(m => m.available !== false && String(m.available).toLowerCase() !== 'false').map(m => {
+    let options = {};
+    if (m.optionsJson) {
+      try { options = JSON.parse(m.optionsJson); } catch (e) { options = {}; }
+    }
+    return {
+      id: String(m.id),
+      storeId: String(m.storeId),
+      name: String(m.name),
+      price: Number(m.price) || 0,
+      prepTime: Number(m.prepTime) || 3,
+      tag: String(m.tag || ''),
+      category: String(m.category || '招牌主餐'),
+      isBafangMode: Boolean(m.isBafangMode === true || String(m.isBafangMode).toLowerCase() === 'true'),
+      image: String(m.image || ''),
+      options: options
+    };
+  });
 
   const enrichedStores = stores.map(s => {
     const cap = Number(s.maxCapacityPer15Min) || 20;
@@ -217,11 +245,7 @@ function getInitBundle(ss, params) {
       rating: Number(s.rating) || 4.8,
       loadPercentage: loadPct,
       loadState: loadState,
-      menus: menus.filter(m => m.storeId === s.id).map(m => ({
-        ...m,
-        price: Number(m.price) || 0,
-        prepTime: Number(m.prepTime) || 3
-      }))
+      menus: parsedMenus.filter(m => m.storeId === s.id)
     };
     storeObj.aiScore = calcAiUtilityScore(storeObj);
     return storeObj;
@@ -271,14 +295,128 @@ function getInitBundle(ss, params) {
 }
 
 /**
- * 真 AI 選餐與動態分流決策引擎 (整合 Gemini 2.5 Flash API + 佇列效用演算法 Fallback)
+ * 儲存並更新指定店家的完整菜單至 Google Sheet `Menus` 表
  */
+function saveStoreMenusToSheet(ss, params) {
+  const storeId = String(params.storeId || '');
+  const newMenus = Array.isArray(params.menus) ? params.menus : [];
+  if (!storeId) throw new Error('缺少 storeId 參數');
+
+  const menuSheet = ss.getSheetByName('Menus');
+  const allRows = menuSheet.getDataRange().getValues();
+  const headers = [
+    'id', 'storeId', 'name', 'price', 'prepTime', 'tag',
+    'available', 'category', 'isBafangMode', 'image', 'optionsJson'
+  ];
+
+  // 保留其他店家的菜單，僅替換當前 storeId 的菜單列
+  const keptRows = [];
+  for (let i = 1; i < allRows.length; i++) {
+    if (String(allRows[i][1]) !== storeId) {
+      const row = allRows[i];
+      keptRows.push([
+        row[0], row[1], row[2], row[3], row[4], row[5],
+        row[6] !== false, row[7] || '招牌主餐', Boolean(row[8]), row[9] || '', row[10] || '{}'
+      ]);
+    }
+  }
+
+  const storeMenuRows = newMenus.map((m, idx) => [
+    m.id || (`M-${storeId}-${Date.now()}-${idx}`),
+    storeId,
+    String(m.name || '未命名餐點'),
+    Number(m.price) || 0,
+    Number(m.prepTime) || 4,
+    String(m.tag || '🔥 店長推薦'),
+    true,
+    String(m.category || '招牌主餐'),
+    Boolean(m.isBafangMode),
+    String(m.image || ''),
+    JSON.stringify(m.options || {})
+  ]);
+
+  const finalRows = [headers, ...keptRows, ...storeMenuRows];
+  menuSheet.clearContents();
+  menuSheet.getRange(1, 1, finalRows.length, headers.length).setValues(finalRows);
+
+  return {
+    message: `已成功儲存 ${storeMenuRows.length} 道菜單品項至雲端資料庫！`,
+    ...getInitBundle(ss, params)
+  };
+}
+
+/**
+ * AI 智慧菜單辨識與自動結構化匯入 (支援菜單照片 Base64 視覺辨識 + 純文字解析)
+ */
+function handleAiMenuScan(ss, params) {
+  const apiKey = params.apiKey || PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || DEFAULT_GEMINI_API_KEY;
+  const rawText = String(params.rawText || '');
+  const imageBase64 = params.imageBase64 || '';
+  const mimeType = params.mimeType || 'image/jpeg';
+
+  if (apiKey && (imageBase64 || rawText)) {
+    try {
+      const sysPrompt = `你是專業的餐飲 POS 系統 AI 菜單建檔專家。
+請辨識使用者提供的菜單圖片或文字，自動整理分類、品名、價格、特色標籤，並根據食物特性自動產生合適的客製化選項群組 (options)。
+若為水餃或鍋貼類單顆計價品項，請將 isBafangMode 設為 true 並在 options 加入「選擇顆數」單選群組。
+請回傳純 JSON 陣列格式：
+[
+  {
+    "category": "分類名稱(如:招牌主餐/特色麵食/單點小菜/湯品飲品)",
+    "name": "餐點名稱",
+    "price": 100,
+    "tag": "🔥 AI推薦",
+    "isBafangMode": false,
+    "options": {
+      "份量選擇": { "type": "radio", "choices": [["正常", 0], ["加大", 15]] },
+      "辣度選擇": { "type": "radio", "choices": [["不辣", 0], ["小辣", 0], ["中辣", 0]] }
+    }
+  }
+]`;
+
+      const parts = [{ text: sysPrompt }];
+      if (rawText) parts.push({ text: '菜單文字內容：\n' + rawText });
+      if (imageBase64) {
+        parts.push({
+          inlineData: {
+            mimeType: mimeType,
+            data: imageBase64.replace(/^data:image\/\w+;base64,/, '')
+          }
+        });
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({
+          contents: [{ parts: parts }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.2 }
+        }),
+        muteHttpExceptions: true
+      });
+      const json = JSON.parse(res.getContentText());
+      const outText = json.candidates && json.candidates[0] && json.candidates[0].content.parts[0].text;
+      if (outText) {
+        return {
+          parsedItems: JSON.parse(outText),
+          engine: 'Google Gemini 2.5 Flash Vision OCR'
+        };
+      }
+    } catch (e) {}
+  }
+
+  return {
+    parsedItems: [],
+    engine: 'Fallback heuristic parser'
+  };
+}
+
 function handleAiConcierge(ss, params) {
   const bundle = getInitBundle(ss, params).bundle;
   const campus = params.campus || '雙溪校區';
   const userQuery = String(params.query || '我趕時間想快點拿到餐，有什麼推薦？');
   const campusStores = bundle.stores.filter(s => s.campus === campus);
-
   const apiKey = params.apiKey || PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY') || DEFAULT_GEMINI_API_KEY;
 
   if (apiKey) {
@@ -298,11 +436,11 @@ function handleAiConcierge(ss, params) {
 使用者需求：「${userQuery}」
 即時各餐廳佇列與菜單數據：${JSON.stringify(storeContext)}
 
-請根據佇列等待時間、優惠活動與使用者需求，挑選最適合的 1~2 道餐點，並回傳純 JSON 格式（不要 markdown 標記）：
+請回傳純 JSON：
 {
   "reasoning": "80字內的專業分析（包含預計省下多少排隊時間、為何推薦該店與優惠亮點）",
-  "storeId": "推薦店家ID (如 S02)",
-  "menuId": "推薦主餐ID (如 M04)",
+  "storeId": "推薦店家ID",
+  "menuId": "推薦主餐ID",
   "engine": "Gemini 2.5 Flash Live"
 }`;
 
@@ -318,16 +456,10 @@ function handleAiConcierge(ss, params) {
       });
       const json = JSON.parse(res.getContentText());
       const text = json.candidates && json.candidates[0] && json.candidates[0].content.parts[0].text;
-      if (text) {
-        const parsed = JSON.parse(text);
-        return { aiResult: parsed };
-      }
-    } catch (e) {
-      // 若 API 呼叫異常則無縫切換至下方的多目標佇列效用演算法
-    }
+      if (text) return { aiResult: JSON.parse(text) };
+    } catch (e) {}
   }
 
-  // 多目標佇列效用演算法 (Multi-Objective Queueing Utility Engine)
   const sorted = campusStores.slice().sort((a, b) => b.aiScore - a.aiScore);
   const bestStore = sorted[0];
   const worstStore = campusStores.slice().sort((a, b) => b.avgPrepMinutes - a.avgPrepMinutes)[0];
@@ -339,7 +471,7 @@ function handleAiConcierge(ss, params) {
       reasoning: `經 M/M/1 佇列模型與效用函數分析，「${worstStore.name}」目前負載達 ${worstStore.loadPercentage}%（需等 ${worstStore.avgPrepMinutes} 分）。強烈建議改點「${bestStore.name}」的【${bestMenu.name} ($${bestMenu.price})】，目前僅需 ${bestStore.avgPrepMinutes} 分鐘（為您省下 ${savedMin} 分鐘），還可享「${bestStore.promoText}」！`,
       storeId: bestStore.id,
       menuId: bestMenu.id,
-      engine: 'MealFlow Queueing Utility AI Engine v4.0'
+      engine: 'MealFlow Queueing Utility AI Engine v5.0'
     }
   };
 }
@@ -348,18 +480,14 @@ function getSingleOrder(ss, params) {
   const orderSheet = ss.getSheetByName('Orders');
   const orders = sheetToObjects(orderSheet);
   const found = orders.find(o => String(o.orderId) === String(params.orderId));
-  if (!found) {
-    return { found: false, message: '找不到該筆訂單' };
-  }
+  if (!found) return { found: false, message: '找不到該筆訂單' };
   return { found: true, order: found };
 }
 
 function generateOrderToken() {
   const chars = '0123456789abcdef';
   let token = 'ORD-';
-  for (let i = 0; i < 12; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  for (let i = 0; i < 12; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
   return token;
 }
 
@@ -373,8 +501,8 @@ function handleOrderSubmission(ss, params) {
   const prefix = params.campus === '城中校區' ? 'C' : 'S';
   const pickupNumber = params.pickupNumber || (prefix + String(Math.floor(100 + Math.random() * 899)));
 
-  const orderSource = String(params.orderSource || 'QR掃碼點餐');
-  const customerNote = String(params.customerNote || '自取');
+  const orderSource = String(params.orderSource || '📱 掃碼點餐');
+  const customerNote = String(params.customerNote || '外帶自取');
   const itemsJson = JSON.stringify(params.items || []);
   const subtotal = Number(params.subtotal) || 0;
   const discount = Number(params.discount) || 0;
@@ -385,22 +513,9 @@ function handleOrderSubmission(ss, params) {
   const isDivertedOrder = Boolean(params.isDivertedOrder);
 
   const newOrderRow = [
-    orderId,
-    pickupNumber,
-    params.storeId,
-    params.storeName,
-    orderSource,
-    customerNote,
-    itemsJson,
-    subtotal,
-    discount,
-    finalTotal,
-    promoApplied,
-    paymentMethod,
-    pickupTimeSlot,
-    '製作中',
-    isDivertedOrder,
-    nowStr
+    orderId, pickupNumber, params.storeId, params.storeName,
+    orderSource, customerNote, itemsJson, subtotal, discount, finalTotal,
+    promoApplied, paymentMethod, pickupTimeSlot, '製作中', isDivertedOrder, nowStr
   ];
   orderSheet.appendRow(newOrderRow);
 
@@ -422,28 +537,11 @@ function handleOrderSubmission(ss, params) {
   return {
     message: '訂單已送出！取餐號碼：' + pickupNumber,
     order: {
-      orderId,
-      pickupNumber,
-      storeId: params.storeId,
-      storeName: params.storeName,
-      studentId: orderSource,
-      studentName: customerNote,
-      itemsJson,
-      subtotal,
-      discount,
-      finalTotal,
-      promoApplied,
-      paymentMethod,
-      pickupTimeSlot,
-      status: '製作中',
-      isDivertedOrder,
-      createdAt: nowStr
+      orderId, pickupNumber, storeId: params.storeId, storeName: params.storeName,
+      studentId: orderSource, studentName: customerNote, itemsJson, subtotal, discount, finalTotal,
+      promoApplied, paymentMethod, pickupTimeSlot, status: '製作中', isDivertedOrder, createdAt: nowStr
     },
-    storeLoad: {
-      storeId: params.storeId,
-      activeOrders: updatedActive,
-      avgPrepMinutes: updatedWait
-    }
+    storeLoad: { storeId: params.storeId, activeOrders: updatedActive, avgPrepMinutes: updatedWait }
   };
 }
 
