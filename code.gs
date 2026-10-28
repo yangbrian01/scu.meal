@@ -8,7 +8,14 @@
  */
 
 const SHEET_ID = '14SaczmfdgXx9t4WfoSBrD_8gs7wzdCcNrsroT0bvzok';
-const DB_SCHEMA_VERSION = 'MEALFLOW_SCHEMA_V7_0';
+const DB_SCHEMA_VERSION = 'MEALFLOW_SCHEMA_V8_0';
+
+// ==================== 系統預設（平台方/您的）官方 LINE 帳號設定 ====================
+// 若店家選擇「不綁定店家自己的官方 LINE」，系統將自動使用下方您的預設官方 LINE 進行 OAuth 綁定與 Flex 卡片推播！
+const scriptProps = PropertiesService.getScriptProperties();
+const SYSTEM_LINE_CLIENT_ID = scriptProps.getProperty('LINE_CLIENT_ID') || '2011878497';
+const SYSTEM_LINE_CLIENT_SECRET = scriptProps.getProperty('LINE_CLIENT_SECRET') || '3d7c605dbb48b8dea47b7ea167c1ec87';
+const SYSTEM_LINE_CHANNEL_TOKEN = scriptProps.getProperty('LINE_CHANNEL_TOKEN') || 'Uxdm520DRvL5r2uuqp5dRwfnBVSzC5PAxoJf/6lGHKfb6vGwGCtYEKUkQDORLyqLujrfPc8Sk9WQBWa/PdIxQS5Bb0lFzi/mNOTsotq2qm8nZKtYheSq+mVStxLoU8lC2DfELj/G3ZM2HKIts6nGOAdB04t89/1O/w1cDnyilFU=';
 
 function doGet(e) {
   const params = (e && e.parameter) ? e.parameter : {};
@@ -22,7 +29,7 @@ function doGet(e) {
 
   return jsonResponse({
     success: true,
-    service: 'MealFlow AI Engine v7.0 (LINE Developers Messaging API + Tablet POS + AI Analytics)',
+    service: 'MealFlow AI Engine v8.0 (LINE OAuth 2.1 + Flex Push + Modern POS + AI Analytics)',
     status: 'ONLINE'
   });
 }
@@ -44,12 +51,6 @@ function doPost(e) {
 
     ensureDatabaseInitialized(ss, Boolean(params.forceInit));
 
-    // ==================== 1. 攔截並處理 LINE Developers Messaging API Webhook 事件 ====================
-    if (params.events && Array.isArray(params.events)) {
-      handleLineWebhookEvents(ss, params.events);
-      return jsonResponse({ success: true, webhook: 'LINE_OK' });
-    }
-
     // 每次請求時自動巡檢並刪除逾期未繳費之遠期預訂單
     purgeExpiredReservations(ss);
 
@@ -69,6 +70,7 @@ function doPost(e) {
         result = updateStoreSettings(ss, params);
         break;
       case 'saveStoreMenus':
+      case 'saveStoreMenu':
         result = saveStoreMenus(ss, params);
         break;
       case 'aiParseMenu':
@@ -89,11 +91,11 @@ function doPost(e) {
       case 'askAiConcierge':
         result = handleAiConcierge(ss, params);
         break;
+      case 'handleLineCallback':
+        result = handleLineCallback(ss, params);
+        break;
       case 'saveLineDevConfig':
         result = saveLineDevConfig(ss, params);
-        break;
-      case 'checkLineBindStatus':
-        result = checkLineBindStatus(ss, params);
         break;
       case 'sendLinePush':
         result = handleManualLinePush(ss, params);
@@ -219,93 +221,250 @@ function ensureDatabaseInitialized(ss, forceCheck) {
   props.setProperty('DB_INIT_VER', DB_SCHEMA_VERSION);
 }
 
-// ==================== LINE Developers Messaging API 真實串接模組 ====================
+// ==================== LINE Login OAuth 2.1 綁定與 LINE Flex Message 推播引擎 (VocabMaster 同款架構) ====================
 /**
- * 處理 LINE 官方帳號 Webhook 傳入的事件：
- * 當學生在 LINE 聊天室輸入「綁定 1234」或直接輸入 4~6 碼綁定碼時，自動取得其真實 lineUserId (Uxxxx...) 並寫入 LineBindings 表！
+ * 取得指定店家的 LINE 金鑰設定：
+ * - 若該店家勾選「綁定本店專屬官方 LINE」，則使用店家的 Client ID / Secret / Channel Token
+ * - 若該店家選擇「不綁定（使用系統預設）」，則自動使用平台方（您的）預設官方 LINE！
  */
-function handleLineWebhookEvents(ss, events) {
+function resolveLineConfigForStore(storeId) {
   const props = PropertiesService.getScriptProperties();
-  const token = props.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || '';
-  const bindSheet = ss.getSheetByName('LineBindings');
+  const sysClientId = props.getProperty('LINE_CLIENT_ID') || SYSTEM_LINE_CLIENT_ID;
+  const sysClientSecret = props.getProperty('LINE_CLIENT_SECRET') || SYSTEM_LINE_CLIENT_SECRET;
+  const sysChannelToken = props.getProperty('LINE_CHANNEL_TOKEN') || props.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || SYSTEM_LINE_CHANNEL_TOKEN;
 
-  events.forEach(ev => {
-    if (!ev || !ev.source || !ev.source.userId) return;
-    const userId = ev.source.userId;
-    const replyToken = ev.replyToken;
-
-    if (ev.type === 'follow') {
-      if (token && replyToken) {
-        replyLineMessage(token, replyToken, '🎉 歡迎加入「東吳學餐 MealFlow」官方通知！\n請在點餐網頁點擊「綁定 LINE 通知」，並將網頁上的 4 位數綁定碼傳送到這裡，即可完成自動綁定！');
-      }
-      return;
-    }
-
-    if (ev.type === 'message' && ev.message && ev.message.type === 'text') {
-      const text = String(ev.message.text || '').trim();
-      const codeMatch = text.match(/(?:綁定\s*)?([A-Za-z0-9]{4,8})/);
-      if (codeMatch) {
-        const bindCode = codeMatch[1].toUpperCase();
-        let displayName = 'LINE用戶';
-        if (token) {
-          try {
-            const profRes = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(userId), {
-              method: 'get',
-              headers: { 'Authorization': 'Bearer ' + token },
-              muteHttpExceptions: true
-            });
-            const prof = JSON.parse(profRes.getContentText());
-            if (prof && prof.displayName) displayName = prof.displayName;
-          } catch (e) {}
-        }
-
-        const nowStr = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
-        bindSheet.appendRow([bindCode, userId, displayName, nowStr]);
-
-        if (token && replyToken) {
-          replyLineMessage(
-            token,
-            replyToken,
-            `✅ 綁定成功！\n嗨 ${displayName}，您的驗證碼【${bindCode}】已成功連結至東吳學餐 MealFlow。\n\n往後您的：\n1. 🟢 訂單成立憑證\n2. 🔔 餐點製作完成取餐呼叫\n3. ⏳ 預訂繳費期限提醒\n4. ❌ 訂單取消或完成通知\n都會即時傳送到此 LINE 對話視窗！`
-          );
+  if (storeId) {
+    try {
+      const rawStoreLine = props.getProperty('STORE_LINE_CFG_' + String(storeId));
+      if (rawStoreLine) {
+        const parsed = JSON.parse(rawStoreLine);
+        if (parsed && parsed.useCustomLineOa && parsed.channelToken) {
+          return {
+            useCustomLineOa: true,
+            clientId: parsed.clientId || sysClientId,
+            clientSecret: parsed.clientSecret || sysClientSecret,
+            channelToken: parsed.channelToken
+          };
         }
       }
-    }
-  });
+    } catch (e) {}
+  }
+
+  return {
+    useCustomLineOa: false,
+    clientId: sysClientId,
+    clientSecret: sysClientSecret,
+    channelToken: sysChannelToken
+  };
 }
 
-function replyLineMessage(token, replyToken, text) {
+/**
+ * 🚀 處理 LINE Login OAuth 2.1 授權回傳 (同 VocabMaster handleLineCallback 架構，免設定 Webhook！)
+ * 1. 用前端傳來的 authorization_code 向 https://api.line.me/oauth2/v2.1/token 換取 access_token
+ * 2. 用 access_token 向 https://api.line.me/v2/profile 取得真實 userId (U開頭 33 碼) 與 displayName
+ */
+function handleLineCallback(ss, params) {
   try {
-    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+    const code = String(params.code || '').trim();
+    const redirectUri = String(params.redirectUri || 'https://yangbrian01.github.io/scu.meal/order/').trim();
+    const storeId = String(params.storeId || '').trim();
+    if (!code) {
+      return { success: false, message: '缺少 LINE 授權碼 (code)' };
+    }
+
+    const lineCfg = resolveLineConfigForStore(storeId);
+    const clientId = String(params.clientId || lineCfg.clientId).trim();
+    const clientSecret = String(params.clientSecret || lineCfg.clientSecret).trim();
+
+    // 1. 取得 LINE OAuth 2.1 Token
+    const tokenResponse = UrlFetchApp.fetch('https://api.line.me/oauth2/v2.1/token', {
       method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': 'Bearer ' + token },
-      payload: JSON.stringify({
-        replyToken: replyToken,
-        messages: [{ type: 'text', text: text }]
-      }),
+      payload: {
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret
+      },
       muteHttpExceptions: true
     });
-  } catch (e) {}
+    const tokenData = JSON.parse(tokenResponse.getContentText());
+    if (!tokenData || !tokenData.access_token) {
+      return {
+        success: false,
+        message: 'LINE Token 交換失敗：' + (tokenData.error_description || tokenData.error || '請確認 Redirect URI 與 Channel Secret')
+      };
+    }
+
+    // 2. 取得使用者 Profile (userId, displayName, pictureUrl)
+    const profileResponse = UrlFetchApp.fetch('https://api.line.me/v2/profile', {
+      method: 'get',
+      headers: {
+        'Authorization': 'Bearer ' + tokenData.access_token
+      },
+      muteHttpExceptions: true
+    });
+    const profileData = JSON.parse(profileResponse.getContentText());
+    const userUID = profileData.userId;
+    const displayName = profileData.displayName || '東吳同學';
+    const pictureUrl = profileData.pictureUrl || '';
+
+    if (!userUID) {
+      return { success: false, message: '無法取得 LINE userId' };
+    }
+
+    // 紀錄至 LineBindings 供備查
+    const bindSheet = ss.getSheetByName('LineBindings');
+    if (bindSheet) {
+      const nowStr = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
+      bindSheet.appendRow(['OAUTH_LOGIN', userUID, displayName, nowStr]);
+    }
+
+    // 綁定成功後立即發送一則 Flex 歡迎卡片確認
+    sendLinePushMessage(
+      ss,
+      userUID,
+      `🎉 嗨 ${displayName}，您已成功綁定東吳學餐 MealFlow 即時通知！往後餐點完成可取餐、預訂繳費提醒與訂單狀態更新都會直接推播至此。`,
+      lineCfg.channelToken,
+      {
+        storeId: storeId,
+        title: 'LINE 帳號綁定成功',
+        subtitle: `嗨 ${displayName}！取餐與預訂通知已啟用`,
+        pickupNumber: 'OK',
+        storeName: '東吳學餐 MealFlow',
+        statusText: '已連結 LINE 推播通知',
+        orderUrl: redirectUri
+      }
+    );
+
+    return {
+      success: true,
+      lineUid: userUID,
+      displayName: displayName,
+      pictureUrl: pictureUrl
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: 'LINE API 驗證失敗: ' + err.toString()
+    };
+  }
 }
 
 /**
- * 透過 LINE Messaging API Push Message 主動推播訊息給指定 lineUserId
+ * 🚀 透過 LINE Messaging API 發送精美 Flex Bubble 卡片推播 (同 VocabMaster sendDailyPushNotifications 架構)
+ * 若店家未綁定自己的官方 LINE，自動使用系統預設（您的）LINE_CHANNEL_TOKEN 發送！
  */
-function sendLinePushMessage(ss, lineUserId, text, tokenOverride) {
-  if (!lineUserId || !String(lineUserId).startsWith('U')) return false;
-  const props = PropertiesService.getScriptProperties();
-  const token = tokenOverride || props.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || '';
-  if (!token) return false;
+function sendLinePushMessage(ss, lineUserId, text, tokenOverride, flexMeta) {
+  const uidStr = String(lineUserId || '').trim();
+  if (!uidStr || !uidStr.startsWith('U') || uidStr.length < 15) return false;
+
+  const storeId = (flexMeta && flexMeta.storeId) ? flexMeta.storeId : '';
+  const lineCfg = resolveLineConfigForStore(storeId);
+  const channelToken = tokenOverride || lineCfg.channelToken;
+  if (!channelToken) return false;
+
+  const meta = flexMeta || {};
+  const titleText = meta.title || '東吳學餐 MealFlow 訂單通知';
+  const storeName = meta.storeName || '東吳學餐';
+  const pickupNumber = meta.pickupNumber || '';
+  const statusText = meta.statusText || '訂單狀態更新';
+  const orderUrl = meta.orderUrl || 'https://yangbrian01.github.io/scu.meal/order/';
+  const accentColor = meta.accentColor || '#3b82f6';
+
+  const contentsArray = [];
+  if (pickupNumber) {
+    contentsArray.push({
+      type: 'box',
+      layout: 'horizontal',
+      contents: [
+        { type: 'text', text: '取餐號碼', size: 'sm', color: '#888888', flex: 2 },
+        { type: 'text', text: '#' + pickupNumber, size: 'md', color: '#ff4500', weight: 'bold', align: 'end', flex: 2 }
+      ]
+    });
+  }
+  contentsArray.push({
+    type: 'box',
+    layout: 'horizontal',
+    margin: 'md',
+    contents: [
+      { type: 'text', text: '取餐櫃位', size: 'sm', color: '#888888', flex: 2 },
+      { type: 'text', text: String(storeName), size: 'sm', color: '#111827', weight: 'bold', align: 'end', flex: 3 }
+    ]
+  });
+  contentsArray.push({
+    type: 'box',
+    layout: 'horizontal',
+    margin: 'md',
+    contents: [
+      { type: 'text', text: '目前狀態', size: 'sm', color: '#888888', flex: 2 },
+      { type: 'text', text: String(statusText), size: 'sm', color: '#10b981', weight: 'bold', align: 'end', flex: 3 }
+    ]
+  });
+
+  const flexBubble = {
+    type: 'bubble',
+    size: 'mega',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      contents: [
+        { type: 'text', text: 'MealFlow 東吳學餐智慧點餐', weight: 'bold', color: accentColor, size: 'sm' },
+        { type: 'text', text: String(titleText), weight: 'bold', size: 'xl', margin: 'md', wrap: true },
+        { type: 'separator', margin: 'xl' },
+        { type: 'box', layout: 'vertical', margin: 'xl', spacing: 'sm', contents: contentsArray },
+        { type: 'separator', margin: 'xl' },
+        { type: 'text', text: String(text), wrap: true, size: 'xs', color: '#555555', margin: 'xl' }
+      ]
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      contents: [
+        {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '🚀 點擊開啟電子取餐單',
+              color: '#ffffff',
+              align: 'center',
+              weight: 'bold',
+              size: 'md'
+            }
+          ],
+          paddingAll: '12px',
+          background: {
+            type: 'linearGradient',
+            angle: '90deg',
+            startColor: '#3b82f6',
+            endColor: '#6366f1'
+          },
+          cornerRadius: '100px',
+          action: {
+            type: 'uri',
+            label: '查看電子取餐單',
+            uri: orderUrl
+          }
+        }
+      ]
+    }
+  };
 
   try {
     const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
       method: 'post',
       contentType: 'application/json',
-      headers: { 'Authorization': 'Bearer ' + token },
+      headers: { 'Authorization': 'Bearer ' + channelToken },
       payload: JSON.stringify({
-        to: String(lineUserId).trim(),
-        messages: [{ type: 'text', text: text }]
+        to: uidStr,
+        messages: [{
+          type: 'flex',
+          altText: titleText + ' - ' + text,
+          contents: flexBubble
+        }]
       }),
       muteHttpExceptions: true
     });
@@ -317,44 +476,49 @@ function sendLinePushMessage(ss, lineUserId, text, tokenOverride) {
 
 function saveLineDevConfig(ss, params) {
   const props = PropertiesService.getScriptProperties();
-  if (params.channelAccessToken !== undefined) {
-    props.setProperty('LINE_CHANNEL_ACCESS_TOKEN', String(params.channelAccessToken).trim());
+  const storeId = String(params.storeId || '').trim();
+
+  if (storeId) {
+    const storeLineCfg = {
+      useCustomLineOa: Boolean(params.useCustomLineOa),
+      clientId: String(params.clientId || '').trim(),
+      clientSecret: String(params.clientSecret || '').trim(),
+      channelToken: String(params.channelAccessToken || '').trim()
+    };
+    props.setProperty('STORE_LINE_CFG_' + storeId, JSON.stringify(storeLineCfg));
   }
-  if (params.botBasicId !== undefined) {
-    props.setProperty('LINE_BOT_BASIC_ID', String(params.botBasicId).trim());
+
+  if (params.systemChannelToken) {
+    props.setProperty('LINE_CHANNEL_TOKEN', String(params.systemChannelToken).trim());
   }
-  if (params.liffId !== undefined) {
-    props.setProperty('LINE_LIFF_ID', String(params.liffId).trim());
+  if (params.systemClientId) {
+    props.setProperty('LINE_CLIENT_ID', String(params.systemClientId).trim());
   }
+  if (params.systemClientSecret) {
+    props.setProperty('LINE_CLIENT_SECRET', String(params.systemClientSecret).trim());
+  }
+
   return {
     saved: true,
-    botBasicId: props.getProperty('LINE_BOT_BASIC_ID') || '',
-    liffId: props.getProperty('LINE_LIFF_ID') || '',
-    hasToken: Boolean(props.getProperty('LINE_CHANNEL_ACCESS_TOKEN'))
+    storeId: storeId
   };
 }
 
-function checkLineBindStatus(ss, params) {
-  const code = String(params.bindCode || '').trim().toUpperCase();
-  if (!code) return { bound: false };
-  const bindSheet = ss.getSheetByName('LineBindings');
-  if (!bindSheet) return { bound: false };
-  const rows = bindSheet.getDataRange().getValues();
-  for (let i = rows.length - 1; i >= 1; i--) {
-    if (String(rows[i][0]).toUpperCase() === code) {
-      return {
-        bound: true,
-        bindCode: code,
-        lineUserId: String(rows[i][1]),
-        displayName: String(rows[i][2] || 'LINE用戶')
-      };
-    }
-  }
-  return { bound: false };
-}
-
 function handleManualLinePush(ss, params) {
-  const sent = sendLinePushMessage(ss, params.lineUserId, params.message, params.channelAccessToken);
+  const sent = sendLinePushMessage(
+    ss,
+    params.lineUserId,
+    params.message,
+    params.channelAccessToken || '',
+    {
+      storeId: params.storeId || '',
+      title: params.title || '東吳學餐 MealFlow 通知',
+      pickupNumber: params.pickupNumber || '',
+      storeName: params.storeName || '東吳學餐',
+      statusText: params.statusText || '即時通知',
+      orderUrl: params.orderUrl || 'https://yangbrian01.github.io/scu.meal/order/'
+    }
+  );
   return { sent };
 }
 
@@ -611,14 +775,21 @@ function handleOrderSubmission(ss, params) {
     }
   }
 
-  // 若顧客已綁定 LINE User ID，透過 LINE Messaging API 推播真實訊息
+  // 若顧客已綁定 LINE User ID，透過 LINE Messaging API (店家專屬或系統預設官方 LINE) 推播 Flex 卡片訊息
   if (extraMeta.lineUserId) {
     const itemSummary = (params.items || []).map(i => `${i.name} x${i.qty}`).join('、');
-    let lineText = `🟢【東吳學餐 MealFlow 訂單成立】\n取餐號碼：#${pickupNumber}\n餐廳：${params.storeName}\n餐點：${itemSummary}\n取餐時間：${params.pickupTimeSlot}\n總計：NT$ ${params.finalTotal} (${params.paymentMethod})`;
+    let lineText = `餐點：${itemSummary}｜取餐時間：${params.pickupTimeSlot}｜總計：NT$ ${params.finalTotal} (${params.paymentMethod})`;
     if (extraMeta.paymentStatus === '待櫃檯繳費' && extraMeta.paymentDeadline) {
-      lineText += `\n\n⚠️ 提醒您：請於 ${extraMeta.paymentDeadline} 23:59 前親至櫃檯繳清現金，逾期未繳系統將自動取消訂單。`;
+      lineText += `\n⚠️ 提醒您：請於 ${extraMeta.paymentDeadline} 23:59 前親至櫃檯繳清現金，逾期未繳系統將自動取消訂單。`;
     }
-    sendLinePushMessage(ss, extraMeta.lineUserId, lineText);
+    sendLinePushMessage(ss, extraMeta.lineUserId, lineText, '', {
+      storeId: params.storeId,
+      title: extraMeta.paymentStatus === '待櫃檯繳費' ? '⏳ 預訂單成立與繳費提醒' : '🟢 訂單成立憑證',
+      pickupNumber: pickupNumber,
+      storeName: params.storeName,
+      statusText: extraMeta.paymentStatus === '待櫃檯繳費' ? `請於 ${extraMeta.paymentDeadline} 前繳費` : '廚房排單製作中',
+      orderUrl: 'https://yangbrian01.github.io/scu.meal/order/?id=' + encodeURIComponent(orderId)
+    });
   }
 
   return {
@@ -808,13 +979,31 @@ function updateOrderState(ss, params) {
           sendLinePushMessage(
             ss,
             meta.lineUserId,
-            `🔔【餐點完成取餐通知】\n您的取餐號碼：#${pickupNo}\n餐廳：${storeName}\n狀態：餐點已製作完成（第 ${meta.notifyCount || 1} 次呼叫），請直接前往櫃檯自取！`
+            `您的餐點已製作完成（第 ${meta.notifyCount || 1} 次呼叫），請直接前往「${storeName}」櫃檯出示 #${pickupNo} 自取！`,
+            '',
+            {
+              storeId: targetStoreId,
+              title: '🔔 餐點完成！請至櫃檯取餐',
+              pickupNumber: pickupNo,
+              storeName: storeName,
+              statusText: `可取餐 (第 ${meta.notifyCount || 1} 次呼叫)`,
+              orderUrl: 'https://yangbrian01.github.io/scu.meal/order/?id=' + encodeURIComponent(String(data[i][0]))
+            }
           );
         } else if (params.newStatus === '已完成') {
           sendLinePushMessage(
             ss,
             meta.lineUserId,
-            `✅【訂單完成結單通知】\n感謝您於「${storeName}」用餐（單號 #${pickupNo}），祝您用餐愉快！`
+            `感謝您於「${storeName}」用餐（單號 #${pickupNo}），祝您用餐愉快！`,
+            '',
+            {
+              storeId: targetStoreId,
+              title: '✅ 訂單完成取餐',
+              pickupNumber: pickupNo,
+              storeName: storeName,
+              statusText: '已完成取餐',
+              orderUrl: 'https://yangbrian01.github.io/scu.meal/order/?id=' + encodeURIComponent(String(data[i][0]))
+            }
           );
         }
       }

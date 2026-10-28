@@ -1,13 +1,13 @@
 /**
- * 東吳學餐 MealFlow v7.0
- * 1. SUNMI 風格全螢幕平板 POS (100dvh 零捲動 + 觸控數字鍵盤找零)
- * 2. 訂單分天管理 (依日期切換 + 櫃檯觸控收款結帳)
- * 3. AI 營運分析中心 (日/週/月 柱狀圖、圓餅圖、折線圖與智慧備料診斷)
- * 4. LINE Developers Messaging API 真實串接 (Webhook 驗證碼自動綁定 userId + Push API)
- * 5. 意圖感知型 AI 選餐顧問 (自然回應打招呼、店家問答與真實佇列推薦)
+ * 東吳學餐 MealFlow v8.0
+ * 1. 現代化美型店家介面 (/store/)：僅在「櫃檯點餐 (POS)」鎖定外層不捲動 (body.pos-no-scroll)，切換至「訂單管理 / AI 分析 / 店務設定」皆可正常自由捲動
+ * 2. 點選「實收金額」彈出觸控數字鍵盤 (#posCashNumpadModal)，主畫面乾淨不擁擠、不跳出系統鍵盤
+ * 3. LINE Login OAuth 2.1 綁定 (VocabMaster 架構，免 Webhook) + Flex Message 推播，支援「店家選填綁定專屬官方 LINE，未綁定自動使用系統主預設官方 LINE」
+ * 4. 付款方式精簡為「現場現金、LINE Pay、街口支付」三種
  */
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzVXQRKZfnhgM_BhW6pgy1VOCg7YmCdfnAdHOS_9Tt7agxQa2r69hwg1UGL73gpoVwp/exec';
+const DEFAULT_LINE_CLIENT_ID = localStorage.getItem('mealflow_system_line_client_id') || '2011878497';
 
 const STORE_ICONS = {
   'S01': '🍙', 'S02': '🍱', 'S03': '🥟', 'S04': '🍗',
@@ -575,14 +575,19 @@ function requestBrowserNotificationPermission() {
 }
 
 /**
- * 透過 LINE Developers Messaging API (經由 GAS 後端 `sendLinePush`) 發送真實 LINE 訊息，並在畫面顯示推播通知卡
+ * 透過 LINE Messaging API (VocabMaster 同款 Flex Message 卡片推播) 發送通知，
+ * 若該店未綁定專屬官方 LINE，後端自動使用系統主預設官方 LINE 推播！
  */
 async function pushLineNotification(eventType, title, message, order = null) {
   const nowStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
   const targetUserId = (order && order.lineUserId) || state.lineProfile.lineUserId || '';
+  const storeObj = order ? state.stores.find(s => s.id === order.storeId) : state.stores.find(s => s.id === state.selectedStoreId);
+  const usingStoreCustomLine = Boolean(storeObj && storeObj.useCustomLineOa && storeObj.customLineChannelToken);
+  const senderLabel = usingStoreCustomLine ? `${storeObj.name} 官方 LINE` : 'MealFlow 系統官方 LINE';
+
   const recipient = state.lineProfile.isBound
     ? `${state.lineProfile.lineDisplayName || 'LINE用戶'} (${targetUserId.slice(0, 10)}...)`
-    : (order && order.customerPhone ? `手機 ${order.customerPhone}` : '尚未綁定 LINE User ID');
+    : (order && order.customerPhone ? `手機 ${order.customerPhone}` : '尚未綁定 LINE 帳號');
 
   const logEntry = {
     id: 'LINE-' + Date.now() + '-' + Math.floor(Math.random() * 100),
@@ -590,6 +595,7 @@ async function pushLineNotification(eventType, title, message, order = null) {
     eventType,
     title,
     message,
+    senderLabel,
     recipient,
     orderId: order ? order.orderId : ''
   };
@@ -604,7 +610,7 @@ async function pushLineNotification(eventType, title, message, order = null) {
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
         <div style="display:flex; align-items:center; gap:6px;">
-          <span style="background:#06C755; color:#fff; font-weight:900; font-size:0.68rem; padding:2px 7px; border-radius:999px;">LINE Messaging API</span>
+          <span style="background:#06C755; color:#fff; font-weight:900; font-size:0.68rem; padding:2px 7px; border-radius:999px;">${escapeHtml(senderLabel)}</span>
           <strong style="font-size:0.84rem; color:#111827;">${escapeHtml(title)}</strong>
         </div>
         <span style="font-size:0.7rem; color:#9CA3AF;">${escapeHtml(nowStr)}</span>
@@ -613,7 +619,7 @@ async function pushLineNotification(eventType, title, message, order = null) {
         ${escapeHtml(message)}
       </div>
       <div style="font-size:0.7rem; color:#059669; font-weight:700;">
-        👤 Push Target：${escapeHtml(recipient)}
+        👤 推播對象：${escapeHtml(recipient)}
       </div>
     `;
     container.prepend(card);
@@ -624,8 +630,11 @@ async function pushLineNotification(eventType, title, message, order = null) {
     }, 6000);
   }
 
-  // 若有綁定真實 LINE Developers userId (U開頭)，自動呼叫 GAS 後端發送真實 LINE Push API
+  // 若已綁定 LINE User ID (U開頭)，自動呼叫 GAS 後端發送 Flex Message 卡片推播
   if (targetUserId && targetUserId.startsWith('U')) {
+    const orderUrl = order
+      ? `${window.location.origin}${getOrderPageUrl('id=' + encodeURIComponent(order.orderId))}`
+      : window.location.href;
     try {
       await fetch(GAS_URL, {
         method: 'POST',
@@ -633,9 +642,15 @@ async function pushLineNotification(eventType, title, message, order = null) {
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'sendLinePush',
+          storeId: order ? order.storeId : (state.selectedStoreId || ''),
           lineUserId: targetUserId,
-          message: `【${title}】\n${message}`,
-          channelAccessToken: state.lineProfile.channelAccessToken || ''
+          title,
+          message,
+          pickupNumber: order ? order.pickupNumber : '',
+          storeName: order ? order.storeName : (storeObj ? storeObj.name : '東吳學餐 MealFlow'),
+          statusText: order ? order.status : '即時通知',
+          orderUrl,
+          channelAccessToken: (usingStoreCustomLine ? storeObj.customLineChannelToken : state.lineProfile.channelAccessToken) || ''
         })
       });
     } catch (e) {}
@@ -645,24 +660,28 @@ async function pushLineNotification(eventType, title, message, order = null) {
 function openLineBindModal() {
   const modal = document.getElementById('lineBindModal');
   if (!modal) return;
-  if (!state.lineProfile.bindCode) {
-    state.lineProfile.bindCode = String(Math.floor(1000 + Math.random() * 9000));
-    saveLineProfile(state.lineProfile);
-  }
-  const codeEl = document.getElementById('lineBindCodeDisplay');
-  if (codeEl) codeEl.innerText = state.lineProfile.bindCode;
-
-  const botId = state.lineProfile.botBasicId || '@mealflow_scu';
-  const deepLinkBtn = document.getElementById('lineOaDeepLinkBtn');
-  if (deepLinkBtn) {
-    const cleanBotId = botId.startsWith('@') ? botId : ('@' + botId);
-    deepLinkBtn.href = `https://line.me/R/oaMessage/${encodeURIComponent(cleanBotId)}/?${encodeURIComponent('綁定 ' + state.lineProfile.bindCode)}`;
-  }
 
   const uidInput = document.getElementById('lineInputId');
   if (uidInput) uidInput.value = state.lineProfile.lineUserId || '';
   const nameInput = document.getElementById('lineInputName');
   if (nameInput) nameInput.value = state.lineProfile.lineDisplayName || '';
+
+  const statusBanner = document.getElementById('lineBindStatusBanner');
+  if (statusBanner) {
+    if (state.lineProfile.isBound && state.lineProfile.lineUserId) {
+      statusBanner.innerHTML = `
+        <div style="background:#DCFCE7; border:1.5px solid #22C55E; border-radius:10px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div>
+            <div style="font-size:0.84rem; font-weight:900; color:#166534;">✅ 已綁定 LINE 帳號：${escapeHtml(state.lineProfile.lineDisplayName || '東吳同學')}</div>
+            <div style="font-size:0.72rem; color:#15803D; font-family:monospace;">UID: ${escapeHtml(state.lineProfile.lineUserId)}</div>
+          </div>
+          <button type="button" onclick="unbindLineAccount()" style="border:1px solid #DC2626; background:#FEF2F2; color:#DC2626; padding:5px 10px; border-radius:8px; font-size:0.74rem; font-weight:800;">解除綁定</button>
+        </div>
+      `;
+    } else {
+      statusBanner.innerHTML = '';
+    }
+  }
 
   renderLineLogsInModal();
   modal.classList.add('open');
@@ -674,31 +693,76 @@ function closeLineBindModal() {
 }
 
 /**
- * 向後端 GAS 查詢學生是否已在 LINE 官方帳號傳送「綁定 XXXX」完成 Webhook 綁定
+ * 仿 VocabMaster 架構：使用 LINE Login OAuth 2.1 (`https://access.line.me/oauth2/v2.1/authorize`) 一鍵授權跳轉綁定
+ * 完全不需設定 Webhook！若店家有綁定專屬官方 LINE 則使用店家 Client ID，否則自動使用系統預設 Client ID。
  */
-async function verifyLineWebhookBinding() {
-  const code = state.lineProfile.bindCode;
-  showToast(`⏳ 正在向 LINE Developers Webhook 查詢驗證碼【${code}】綁定狀態...`);
+function startLineOAuthLogin() {
+  const activeStore = state.stores.find(s => s.id === (state.selectedStoreId || state.merchantStoreId));
+  const useCustom = Boolean(activeStore && activeStore.useCustomLineOa && activeStore.customLineClientId);
+  const clientId = useCustom
+    ? activeStore.customLineClientId.trim()
+    : (state.lineProfile.customClientId || DEFAULT_LINE_CLIENT_ID);
+
+  // 取當前乾淨網址作為 OAuth Redirect URI
+  const redirectUri = window.location.origin + window.location.pathname;
+  const storeState = activeStore ? activeStore.id : 'SYSTEM';
+  try {
+    sessionStorage.setItem('mealflow_line_oauth_redirect', redirectUri);
+    sessionStorage.setItem('mealflow_line_oauth_store', storeState);
+  } catch (e) {}
+
+  const authUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=bind_${encodeURIComponent(storeState)}&scope=profile%20openid`;
+  window.location.href = authUrl;
+}
+
+/**
+ * 當從 LINE Login OAuth 2.1 授權頁面跳轉回來 (`?code=...&state=bind_...`) 時，
+ * 自動呼叫後端 GAS `handleLineCallback` 換取 `lineUid` 與 `displayName` 完成綁定！
+ */
+async function checkLineOAuthCallbackOnLoad() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const oauthState = params.get('state') || '';
+  if (!code || !oauthState.startsWith('bind')) return;
+
+  const storeIdFromState = oauthState.includes('_') ? oauthState.split('_')[1] : (sessionStorage.getItem('mealflow_line_oauth_store') || '');
+  const redirectUri = sessionStorage.getItem('mealflow_line_oauth_redirect') || (window.location.origin + window.location.pathname);
+
+  showToast('⏳ 正在完成 LINE Login 帳號授權綁定...');
   try {
     const res = await fetch(GAS_URL, {
       method: 'POST',
       mode: 'cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'checkLineBindStatus', bindCode: code })
+      body: JSON.stringify({
+        action: 'handleLineCallback',
+        code,
+        redirectUri,
+        storeId: storeIdFromState
+      })
     });
     const data = await res.json();
-    if (data && data.bound && data.lineUserId) {
+    if (data && data.status === 'success' && data.lineUid) {
       state.lineProfile.isBound = true;
-      state.lineProfile.lineUserId = data.lineUserId;
-      state.lineProfile.lineDisplayName = data.displayName || 'LINE用戶';
+      state.lineProfile.lineUserId = data.lineUid;
+      state.lineProfile.lineDisplayName = data.displayName || 'LINE 用戶';
       saveLineProfile(state.lineProfile);
-      openLineBindModal();
       applyRouteView();
-      showToast(`🎉 Webhook 自動綁定成功！已連結 LINE User ID: ${data.lineUserId.slice(0, 10)}...`);
-      return;
+      showToast(`🎉 LINE 綁定成功！歡迎 ${state.lineProfile.lineDisplayName}`);
+    } else {
+      showToast(`⚠️ LINE 授權換取失敗：${(data && data.message) || '請確認 Channel ID / Secret 與 Callback URL 設定'}`);
     }
-  } catch (e) {}
-  showToast('⚠️ 尚未收到此驗證碼的 LINE 訊息。請先在 LINE 傳送綁定碼，或在下方直接貼上您的 LINE User ID (U開頭) 綁定！');
+  } catch (e) {
+    showToast('⚠️ 無法連線至後端交換 LINE Token');
+  } finally {
+    // 清除網址列上的 code 與 state 參數，保持網址乾淨
+    params.delete('code');
+    params.delete('state');
+    params.delete('friendship_status_changed');
+    const cleanSearch = params.toString();
+    const cleanUrl = window.location.pathname + (cleanSearch ? '?' + cleanSearch : '');
+    window.history.replaceState({}, '', cleanUrl);
+  }
 }
 
 function saveLineBindConfig() {
@@ -713,10 +777,10 @@ function saveLineBindConfig() {
 
   pushLineNotification(
     'BIND_SUCCESS',
-    '💚 LINE Messaging API 綁定成功',
-    `已成功綁定 LINE User ID (${lineId.slice(0, 12)}...)！當餐點完成、預訂需繳費或訂單異動時，將透過 LINE Push API 即時推播給您。`
+    '💚 LINE 帳號綁定成功',
+    `已綁定 ${name} (${lineId.slice(0, 10)}...)！當餐點完成、預訂需繳費或訂單異動時，將自動透過官方 LINE 推播通知您。`
   );
-  renderLineLogsInModal();
+  openLineBindModal();
   applyRouteView();
   showToast('✅ LINE 通知綁定成功！');
 }
@@ -735,13 +799,13 @@ function renderLineLogsInModal() {
   const box = document.getElementById('lineLogsContainer');
   if (!box) return;
   if (state.lineMessageLogs.length === 0) {
-    box.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:12px;">尚無 LINE Messaging API 推播紀錄</p>`;
+    box.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted); text-align:center; padding:12px;">尚無 LINE 推播紀錄</p>`;
     return;
   }
   box.innerHTML = state.lineMessageLogs.slice(0, 8).map(log => `
     <div style="background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:8px 12px; margin-bottom:6px; font-size:0.78rem;">
       <div style="display:flex; justify-content:space-between; font-weight:800; color:#166534;">
-        <span>${escapeHtml(log.title)}</span>
+        <span>${escapeHtml(log.title)} <small style="color:#059669;">(${escapeHtml(log.senderLabel || '官方LINE')})</small></span>
         <span>${escapeHtml(log.time)}</span>
       </div>
       <div style="color:#374151; margin-top:2px;">${escapeHtml(log.message)}</div>
@@ -898,6 +962,7 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   });
   applyRouteView();
+  checkLineOAuthCallbackOnLoad();
   syncCloud(false);
 });
 
@@ -918,6 +983,10 @@ async function syncCloud(showSuccessToast = false) {
           return {
             ...cloudStore,
             cutleryPrice: cloudStore.cutleryPrice !== undefined ? Number(cloudStore.cutleryPrice) : (localMatch && localMatch.cutleryPrice !== undefined ? Number(localMatch.cutleryPrice) : 1),
+            useCustomLineOa: cloudStore.useCustomLineOa !== undefined ? Boolean(cloudStore.useCustomLineOa) : Boolean(localMatch && localMatch.useCustomLineOa),
+            customLineClientId: cloudStore.customLineClientId || (localMatch ? localMatch.customLineClientId : '') || '',
+            customLineClientSecret: cloudStore.customLineClientSecret || (localMatch ? localMatch.customLineClientSecret : '') || '',
+            customLineChannelToken: cloudStore.customLineChannelToken || (localMatch ? localMatch.customLineChannelToken : '') || '',
             menus: (Array.isArray(cloudStore.menus) && cloudStore.menus.length > 0)
               ? cloudStore.menus
               : (localMatch ? localMatch.menus : [])
@@ -976,12 +1045,20 @@ async function syncCloud(showSuccessToast = false) {
   }
 }
 
+/**
+ * 只有當處於「店家端 (/store/)」且在「櫃檯點餐 (pos)」分頁時，才鎖定外層頁面不上下滑動 (`body.pos-no-scroll`)，
+ * 切換到「訂單管理」、「AI 分析」、「店務設定」或學生頁面時，皆可正常自由捲動！
+ */
+function updateBodyScrollLock() {
+  document.body.classList.remove('store-fullscreen');
+  document.body.classList.toggle('store-mode-active', state.routeMode === 'store');
+  document.body.classList.toggle('pos-no-scroll', state.routeMode === 'store' && state.storeTabMode === 'pos');
+}
+
 function applyRouteView() {
   autoPurgeExpiredUnpaidOrders();
   enrichStoresAndAi();
-
-  // 當處於店家 POS 模式 (/store/) 時，掛載 body.store-fullscreen 讓畫面 100dvh 零捲動塞滿整台平板！
-  document.body.classList.toggle('store-fullscreen', state.routeMode === 'store');
+  updateBodyScrollLock();
 
   const lineBtnText = document.getElementById('headerLineBtnText');
   if (lineBtnText) {
@@ -1015,7 +1092,11 @@ function applyRouteView() {
 
   const roleBadge = document.getElementById('headerRoleBadge');
   if (roleBadge) {
-    if (state.routeMode === 'ticket') {
+    if (state.routeMode === 'store') {
+      roleBadge.innerText = '🖥️ 店家櫃檯 POS 與營運中心';
+      roleBadge.style.background = 'var(--brand-light)';
+      roleBadge.style.color = 'var(--brand-dark)';
+    } else if (state.routeMode === 'ticket') {
       roleBadge.innerText = '🎟️ 訂單專屬追蹤憑證';
       roleBadge.style.background = 'var(--brand-light)';
       roleBadge.style.color = 'var(--brand-dark)';
@@ -1772,7 +1853,6 @@ function updateCartUI() {
             </option>
             <option value="LINE Pay" ${state.checkoutPayMethod === 'LINE Pay' ? 'selected' : ''}>LINE Pay</option>
             <option value="街口支付" ${state.checkoutPayMethod === '街口支付' ? 'selected' : ''}>街口支付</option>
-            <option value="Apple Pay" ${state.checkoutPayMethod === 'Apple Pay' ? 'selected' : ''}>Apple Pay</option>
           </select>
         </div>
         <div>
@@ -2363,20 +2443,21 @@ function copyOrderUrl(url) {
   }
 }
 
-// ==================== 6. 店家端商用平板全螢幕系統 (`/store/`) ====================
+// ==================== 6. 店家端現代化美型系統 (`/store/`) ====================
 /**
- * 切換左側直向導覽列 4 大主頁籤：
- * - 'pos'       : 🖥️ 收銀台 (滿版平板 POS + 螢幕觸控數字鍵盤)
- * - 'kds'       : 📋 訂單 (分天檢視 + 預訂/待收款一鍵收現找零 + 持續通知取餐)
- * - 'analytics' : 📊 AI 分析 (日/週/月 柱狀圖、圓餅圖、折線圖、AI 備料診斷)
- * - 'settings'  : ⚙️ 設定 (菜單管理&AI掃描、一次性餐具收費與AI分流、LINE Developers 設定)
+ * 切換頂部導覽列 4 大主頁籤：
+ * - 'pos'       : 🖥️ 櫃檯點餐 (POS) — 鎖定外層不滑動 (body.pos-no-scroll)，雙欄剛好塞滿平板畫面
+ * - 'kds'       : 📋 訂單管理 — 解除外層鎖定，可自由上下滑動，支援分天檢視與預訂收款
+ * - 'analytics' : 📊 AI 營運分析 — 解除外層鎖定，可自由上下滑動，日/週/月圖表與備料診斷
+ * - 'settings'  : ⚙️ 店務設定 — 解除外層鎖定，可自由上下滑動，菜單管理/餐具與優惠/LINE OAuth 設定
  */
 function switchStoreTabMode(mode) {
   state.storeTabMode = mode;
+  updateBodyScrollLock();
   ['pos', 'kds', 'analytics', 'settings'].forEach(m => {
     document.getElementById(`railBtn-${m}`)?.classList.toggle('active', m === mode);
     const panel = document.getElementById(`storePanel-${m}`);
-    if (panel) panel.style.display = (m === mode) ? 'flex' : 'none';
+    if (panel) panel.style.display = (m === mode) ? 'block' : 'none';
   });
   renderMerchantView();
 }
@@ -2392,15 +2473,24 @@ function switchMerchantStore(storeId) {
   state.posSelectedCategory = '全部';
   state.posCart = [];
   state.posCashReceived = '';
+  const topSel = document.getElementById('storeTopSwitcher');
+  if (topSel && topSel.value !== storeId) topSel.value = storeId;
   renderMerchantView();
 }
 
 function renderMerchantView() {
   enrichStoresAndAi();
+  updateBodyScrollLock();
   const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
   if (!store) return;
 
-  // 更新左側導覽列上的待處理訂單數徽章
+  // 同步頂部導覽列的店家下拉選單
+  const topSel = document.getElementById('storeTopSwitcher');
+  if (topSel) {
+    topSel.innerHTML = state.stores.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === store.id ? 'selected' : ''}>${escapeHtml(s.campus)} — ${escapeHtml(s.name)}</option>`).join('');
+  }
+
+  // 更新導覽列上的待處理訂單數徽章
   const storeActiveOrders = state.orders.filter(o => o.storeId === store.id && (o.status === '製作中' || o.status === '可取餐' || o.paymentStatus === '待櫃檯繳費'));
   const badgeEl = document.getElementById('railKdsBadge');
   if (badgeEl) {
@@ -2419,7 +2509,7 @@ function renderMerchantView() {
   }
 }
 
-// ==================== 6.1 SUNMI 風格全螢幕平板 POS 收銀台 (內建觸控數字鍵盤，零外層捲動) ====================
+// ==================== 6.1 現代化美型平板 POS 櫃檯點餐 (零外層捲動 + 點選實收彈出數字鍵盤) ====================
 function selectPosCategory(cat) {
   state.posSelectedCategory = cat;
   const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
@@ -2451,11 +2541,25 @@ function setPosQuickCash(val) {
   state.posCashReceived = String(val);
   const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
   if (store) renderPosCashierPanel(store);
+  if (document.getElementById('posCashNumpadModal')?.classList.contains('open')) {
+    renderPosCashNumpadModal();
+  }
 }
 
 /**
- * 螢幕觸控數字鍵盤點擊處理（店員直接點螢幕上的 0-9 / 00 / C / ⌫，完全不跳出平板系統鍵盤！）
+ * 點擊「🔢 實收金額」時彈出觸控數字鍵盤視窗 (`#posCashNumpadModal`)，不佔用主畫面、不跳出系統鍵盤
  */
+function openPosCashNumpadModal() {
+  renderPosCashNumpadModal();
+  document.getElementById('posCashNumpadModal')?.classList.add('open');
+}
+
+function closePosCashNumpadModal() {
+  document.getElementById('posCashNumpadModal')?.classList.remove('open');
+  const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
+  if (store) renderPosCashierPanel(store);
+}
+
 function posTapNumpad(key) {
   let cur = String(state.posCashReceived || '');
   if (key === 'C') {
@@ -2470,6 +2574,72 @@ function posTapNumpad(key) {
   state.posCashReceived = cur;
   const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
   if (store) renderPosCashierPanel(store);
+  renderPosCashNumpadModal();
+}
+
+function renderPosCashNumpadModal() {
+  const box = document.getElementById('posCashNumpadBody');
+  const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
+  if (!box || !store) return;
+
+  const storeCutleryPrice = store.cutleryPrice !== undefined ? Number(store.cutleryPrice) : 1;
+  const subtotal = state.posCart.reduce((sum, i) => sum + i.price * (i.qty || 1), 0);
+  const cutleryFee = (subtotal > 0 && state.posNeedCutlery) ? storeCutleryPrice : 0;
+  const promoActive = isStorePromoActive(store);
+  const discount = (subtotal > 0 && promoActive && store.promoMode === 'discount') ? (Number(store.promoDiscount) || 10) : 0;
+  const finalTotal = Math.max(0, subtotal + cutleryFee - discount);
+
+  const cashReceivedNum = state.posCashReceived !== '' ? parseFloat(state.posCashReceived) : finalTotal;
+  const changeAmount = Math.max(0, cashReceivedNum - finalTotal);
+  const isShort = state.posCashReceived !== '' && cashReceivedNum < finalTotal;
+
+  box.innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+      <div style="background:var(--bg-page); padding:10px 12px; border-radius:12px; border:1px solid var(--border);">
+        <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:800;">🧾 應收總計</div>
+        <div style="font-size:1.35rem; font-weight:950; color:var(--text-primary);">NT$ ${finalTotal}</div>
+      </div>
+      <div style="background:${isShort ? 'var(--red-bg)' : 'var(--green-bg)'}; padding:10px 12px; border-radius:12px; border:1.5px solid ${isShort ? 'var(--red)' : 'var(--green)'};">
+        <div style="font-size:0.75rem; color:${isShort ? 'var(--red)' : 'var(--green)'}; font-weight:800;">🪙 應找零錢</div>
+        <div style="font-size:1.35rem; font-weight:950; color:${isShort ? 'var(--red)' : 'var(--green)'};">
+          ${isShort ? `不足 $${finalTotal - cashReceivedNum}` : `NT$ ${changeAmount}`}
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#FFF7ED; border:2px solid var(--brand); border-radius:12px; padding:10px 14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:0.84rem; font-weight:900; color:var(--brand-dark);">💵 顧客實收金額</span>
+      <span style="font-size:1.6rem; font-weight:950; color:var(--brand-dark);">
+        NT$ ${state.posCashReceived !== '' ? escapeHtml(state.posCashReceived) : `${finalTotal} (剛好)`}
+      </span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:10px;">
+      <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(${finalTotal})">剛好 ($${finalTotal})</button>
+      <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(100)">$100</button>
+      <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(500)">$500</button>
+      <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(1000)">$1000</button>
+    </div>
+
+    <div class="pos-numpad-grid" style="margin-bottom:12px;">
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('7')">7</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('8')">8</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('9')">9</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('4')">4</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('5')">5</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('6')">6</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('1')">1</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('2')">2</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('3')">3</button>
+      <button type="button" class="pos-numpad-key clear" onclick="posTapNumpad('C')">C 清空</button>
+      <button type="button" class="pos-numpad-key" onclick="posTapNumpad('0')">0</button>
+      <button type="button" class="pos-numpad-key back" onclick="posTapNumpad('BACK')">⌫</button>
+    </div>
+
+    <button type="button" class="btn-primary-full" onclick="closePosCashNumpadModal()">
+      ✅ 確認實收金額 (找零 NT$ ${changeAmount})
+    </button>
+  `;
 }
 
 function renderPosCashierPanel(store) {
@@ -2502,140 +2672,57 @@ function renderPosCashierPanel(store) {
   const isCashInsufficient = state.posPayment === '現場現金' && state.posCashReceived !== '' && cashReceivedNum < finalTotal;
 
   panel.innerHTML = `
-    <!-- 頂部精簡狀態列：櫃位切換 + 分類快速標籤 -->
-    <div class="pos-topbar">
-      <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-        <select class="select-input" style="width:auto; min-width:190px; padding:6px 10px; font-weight:900; font-size:0.88rem;" onchange="switchMerchantStore(this.value)">
-          ${state.stores.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === store.id ? 'selected' : ''}>${escapeHtml(s.campus)} - ${escapeHtml(s.name)}</option>`).join('')}
-        </select>
-        <span class="wait-pill ${store.loadState === 'FULL' ? 'wait-full' : store.loadState === 'MODERATE' ? 'wait-mod' : 'wait-free'}" style="font-size:0.75rem; padding:4px 10px;">
-          待製 ${store.activeOrders}/${store.maxCapacityPer15Min} 單 (${store.avgPrepMinutes}分)
-        </span>
-      </div>
+    <div class="pos-modern-workspace">
+      <!-- 左側：分類篩選列 + 現代化餐點磁貼網格 -->
+      <div class="pos-menu-card">
+        <div class="pos-cat-strip">
+          ${categories.map(cat => `
+            <button type="button" class="pos-cat-pill ${state.posSelectedCategory === cat ? 'active' : ''}" onclick="selectPosCategory('${escapeHtml(cat)}')">
+              ${escapeHtml(cat)}
+            </button>
+          `).join('')}
+          <span class="wait-pill ${store.loadState === 'FULL' ? 'wait-full' : store.loadState === 'MODERATE' ? 'wait-mod' : 'wait-free'}" style="margin-left:auto; align-self:center;">
+            佇列 ${store.activeOrders}/${store.maxCapacityPer15Min} 單 (約 ${store.avgPrepMinutes} 分)
+          </span>
+        </div>
 
-      <div class="pos-cat-strip">
-        ${categories.map(cat => `
-          <button type="button" class="pos-cat-pill ${state.posSelectedCategory === cat ? 'active' : ''}" onclick="selectPosCategory('${escapeHtml(cat)}')">
-            ${escapeHtml(cat)}
-          </button>
-        `).join('')}
-      </div>
-    </div>
-
-    <!-- 滿版雙欄主畫面：左側「商品磁貼 + 底部收銀數字鍵盤」、右側「結帳明細單」 -->
-    <div class="pos-screen-grid">
-      <div class="pos-left-area">
-        <!-- 餐點磁貼網格 (仿商米 SUNMI 白底藍字磁貼) -->
         <div class="pos-dish-grid">
           ${filteredMenus.map(m => {
             const hasOpts = m.options && Object.keys(m.options).length > 0;
             return `
               <div class="pos-dish-tile" onclick="handleMenuItemClick('${escapeHtml(m.id)}', true)">
                 <div>
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                    <span class="pos-tile-cat">${escapeHtml(m.category || '單點')}</span>
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
+                    <span class="pos-tile-cat">${escapeHtml(m.category || '招牌')}</span>
                     ${hasOpts ? `<span class="pos-tile-opt">⚙️ 客製</span>` : ''}
                   </div>
                   <div class="pos-tile-name">${escapeHtml(m.name)}</div>
                 </div>
-                <div class="pos-tile-price">NT$ ${m.price}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span class="pos-tile-price">NT$ ${m.price}</span>
+                  <span style="width:22px; height:22px; border-radius:50%; background:var(--brand-light); color:var(--brand-dark); display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem;">＋</span>
+                </div>
               </div>
             `;
           }).join('')}
         </div>
-
-        <!-- 左下角固定收銀操作艙：取餐/支付設定 + 螢幕觸控數字鍵盤 (免跳出系統鍵盤) -->
-        <div class="pos-bottom-dock">
-          <!-- 左側：取餐、餐具、預訂日期、支付方式 -->
-          <div class="pos-quick-controls">
-            <div style="display:grid; grid-template-columns:1fr 1fr 1.2fr; gap:5px;">
-              <button type="button" class="pos-chip-btn ${state.posDineType === '內用自取' ? 'active' : ''}" onclick="setPosOption('posDineType', '內用自取')">🍽️ 內用自取</button>
-              <button type="button" class="pos-chip-btn ${state.posDineType === '外帶自取' ? 'active' : ''}" onclick="setPosOption('posDineType', '外帶自取')">🛍️ 外帶自取</button>
-              <button type="button" class="pos-chip-btn ${state.posNeedCutlery ? 'active' : ''}" onclick="setPosOption('posNeedCutlery', !state.posNeedCutlery)">
-                🥢 一次性餐具 (${storeCutleryPrice > 0 ? `+$${storeCutleryPrice}` : '$0'})
-              </button>
-            </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
-              <button type="button" class="pos-chip-btn ${state.posTimeMode === 'NOW' ? 'active' : ''}" onclick="setPosOption('posTimeMode', 'NOW')">⚡ 立即出餐</button>
-              <button type="button" class="pos-chip-btn ${state.posTimeMode === 'RESERVE' ? 'active' : ''}" onclick="setPosOption('posTimeMode', 'RESERVE')">📅 預訂取餐</button>
-            </div>
-
-            ${isReserve ? `
-              <div style="display:grid; grid-template-columns:1fr 0.85fr 1.15fr; gap:4px; background:#F8FAFC; padding:5px; border-radius:8px; border:1px solid #CBD5E1;">
-                <input type="date" class="select-input" style="padding:4px 6px; font-size:0.74rem;" min="${getTodayDateStr()}" value="${escapeHtml(state.posReserveDate)}" onchange="setPosOption('posReserveDate', this.value)">
-                <input type="time" class="select-input" style="padding:4px 6px; font-size:0.74rem;" value="${escapeHtml(state.posReserveTime)}" onchange="state.posReserveTime=this.value">
-                <input type="tel" class="select-input" style="padding:4px 6px; font-size:0.74rem; border-color:var(--red);" placeholder="📱 預訂電話(必填)" value="${escapeHtml(state.posCustomerPhone)}" oninput="state.posCustomerPhone=this.value">
-              </div>
-            ` : ''}
-
-            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
-              ${['現場現金', 'LINE Pay', '街口支付', 'Apple Pay'].map(pay => {
-                const disabled = (pay === '現場現金' && isCashForbidden);
-                return `
-                  <button type="button" class="pos-chip-btn ${state.posPayment === pay ? 'active' : ''}" ${disabled ? 'disabled style="opacity:0.35; cursor:not-allowed;"' : ''} onclick="setPosOption('posPayment', '${pay}')">
-                    ${pay === '現場現金' && isCashForbidden ? '現金(禁)' : pay}
-                  </button>
-                `;
-              }).join('')}
-            </div>
-
-            <!-- 實收與找零即時顯示 + 快速面額鍵 -->
-            <div style="display:flex; justify-content:space-between; align-items:center; background:#0F172A; color:#FFFFFF; padding:6px 10px; border-radius:8px; margin-top:auto;">
-              <div>
-                <div style="font-size:0.68rem; color:#94A3B8; font-weight:700;">💵 實收現金 (點擊右側數字鍵輸入)</div>
-                <div style="font-size:1.05rem; font-weight:950; color:#38BDF8;">
-                  NT$ ${state.posCashReceived !== '' ? escapeHtml(state.posCashReceived) : `${finalTotal} (剛好)`}
-                </div>
-              </div>
-              <div style="text-align:right;">
-                <div style="font-size:0.68rem; color:#94A3B8; font-weight:700;">🪙 應找零錢</div>
-                <div style="font-size:1.1rem; font-weight:950; color:${isCashInsufficient ? '#F87171' : '#34D399'};">
-                  ${isCashInsufficient ? `不足 $${finalTotal - cashReceivedNum}` : `NT$ ${changeAmount}`}
-                </div>
-              </div>
-            </div>
-
-            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px;">
-              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(${finalTotal})">剛好 ($${finalTotal})</button>
-              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(100)">$100</button>
-              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(500)">$500</button>
-              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(1000)">$1000</button>
-            </div>
-          </div>
-
-          <!-- 右側：商米風格大顆觸控數字鍵盤 (點擊直接輸入實收金額，免鍵盤) -->
-          <div class="pos-numpad-grid">
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('7')">7</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('8')">8</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('9')">9</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('4')">4</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('5')">5</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('6')">6</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('1')">1</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('2')">2</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('3')">3</button>
-            <button type="button" class="pos-numpad-key clear" onclick="posTapNumpad('C')">C 清空</button>
-            <button type="button" class="pos-numpad-key" onclick="posTapNumpad('0')">0</button>
-            <button type="button" class="pos-numpad-key back" onclick="posTapNumpad('BACK')">⌫</button>
-          </div>
-        </div>
       </div>
 
-      <!-- 右欄：POS 收銀明細與結帳出單區 -->
+      <!-- 右側：現代化明亮收銀結帳單 -->
       <div class="pos-receipt-column">
         <div class="pos-receipt-header">
           <div>
-            <div style="font-size:0.92rem; font-weight:900;">🧾 收銀結帳單 (${state.posCart.reduce((s, i) => s + (i.qty || 1), 0)} 份)</div>
-            <div style="font-size:0.72rem; color:#94A3B8;">${escapeHtml(store.name)} ・ 櫃檯叫號自取</div>
+            <div style="font-size:0.96rem; font-weight:900; color:var(--text-primary);">🧾 櫃檯點餐結帳單 (${state.posCart.reduce((s, i) => s + (i.qty || 1), 0)} 份)</div>
+            <div style="font-size:0.74rem; color:var(--text-secondary);">${escapeHtml(store.name)} ・ 叫號自取</div>
           </div>
-          ${state.posCart.length > 0 ? `<button type="button" onclick="clearPosCart()" style="border:none; background:rgba(239,68,68,0.25); color:#FCA5A5; padding:4px 8px; border-radius:6px; font-size:0.72rem; font-weight:800; cursor:pointer;">🗑️ 清空</button>` : ''}
+          ${state.posCart.length > 0 ? `<button type="button" onclick="clearPosCart()" style="border:1px solid #FECACA; background:var(--red-bg); color:var(--red); padding:4px 10px; border-radius:8px; font-size:0.74rem; font-weight:800;">🗑️ 清空</button>` : ''}
         </div>
 
         <div class="pos-receipt-list">
           ${state.posCart.length === 0 ? `
-            <div style="text-align:center; color:var(--text-muted); padding:44px 12px; font-size:0.86rem;">
-              👈 請點擊左側餐點磁貼加入結帳單
+            <div style="text-align:center; color:var(--text-muted); padding:38px 12px; font-size:0.86rem;">
+              <div style="font-size:2rem; margin-bottom:6px;">🍱</div>
+              請點擊左側餐點卡片加入結帳單
             </div>
           ` : state.posCart.map((item, idx) => {
             const selStr = item.selections && Object.keys(item.selections).length > 0
@@ -2652,10 +2739,10 @@ function renderPosCashierPanel(store) {
                   <div style="font-size:0.78rem; font-weight:900; color:var(--red);">NT$ ${item.price * (item.qty || 1)}</div>
                 </div>
                 <div style="display:flex; align-items:center; gap:4px;">
-                  ${canEdit ? `<button type="button" onclick="editCartItemOptions(${idx}, true)" style="border:1px solid var(--border); background:#EFF6FF; color:#1D4ED8; width:24px; height:24px; border-radius:6px; font-size:0.72rem; font-weight:800;">✎</button>` : ''}
-                  <button type="button" onclick="changePosCartQty(${idx}, -1)" style="border:1px solid var(--border); background:#F8FAFC; width:24px; height:24px; border-radius:6px; font-weight:900;">-</button>
+                  ${canEdit ? `<button type="button" onclick="editCartItemOptions(${idx}, true)" style="border:1px solid var(--border); background:#EFF6FF; color:#1D4ED8; width:26px; height:26px; border-radius:6px; font-size:0.74rem; font-weight:800;">✎</button>` : ''}
+                  <button type="button" onclick="changePosCartQty(${idx}, -1)" style="border:1px solid var(--border); background:#FFFFFF; width:26px; height:26px; border-radius:6px; font-weight:900;">－</button>
                   <span style="font-weight:900; min-width:18px; text-align:center; font-size:0.84rem;">${item.qty || 1}</span>
-                  <button type="button" onclick="changePosCartQty(${idx}, 1)" style="border:1px solid var(--border); background:#F8FAFC; width:24px; height:24px; border-radius:6px; font-weight:900;">+</button>
+                  <button type="button" onclick="changePosCartQty(${idx}, 1)" style="border:1px solid var(--border); background:#FFFFFF; width:26px; height:26px; border-radius:6px; font-weight:900;">＋</button>
                 </div>
               </div>
             `;
@@ -2663,18 +2750,58 @@ function renderPosCashierPanel(store) {
         </div>
 
         <div class="pos-receipt-footer">
-          <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:var(--text-secondary); margin-bottom:2px;">
-            <span>餐點小計 ${cutleryFee > 0 ? `+ 餐具($${cutleryFee})` : ''}</span>
-            <span>NT$ ${subtotal + cutleryFee}</span>
+          <!-- 取餐與餐具設定 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1.25fr; gap:5px; margin-bottom:6px;">
+            <button type="button" class="pos-chip-btn ${state.posDineType === '內用自取' ? 'active' : ''}" onclick="setPosOption('posDineType', '內用自取')">🍽️ 內用自取</button>
+            <button type="button" class="pos-chip-btn ${state.posDineType === '外帶自取' ? 'active' : ''}" onclick="setPosOption('posDineType', '外帶自取')">🛍️ 外帶自取</button>
+            <button type="button" class="pos-chip-btn ${state.posNeedCutlery ? 'active' : ''}" onclick="setPosOption('posNeedCutlery', !state.posNeedCutlery)">
+              🥢 餐具 (${storeCutleryPrice > 0 ? `+$${storeCutleryPrice}` : '$0'})
+            </button>
           </div>
-          ${discount > 0 ? `
-            <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:var(--green); font-weight:800; margin-bottom:2px;">
-              <span>🎁 AI 分流折抵</span>
-              <span>-NT$ ${discount}</span>
+
+          <!-- 立即 vs 預訂 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:6px;">
+            <button type="button" class="pos-chip-btn ${state.posTimeMode === 'NOW' ? 'active' : ''}" onclick="setPosOption('posTimeMode', 'NOW')">⚡ 立即出餐</button>
+            <button type="button" class="pos-chip-btn ${state.posTimeMode === 'RESERVE' ? 'active' : ''}" onclick="setPosOption('posTimeMode', 'RESERVE')">📅 預訂取餐</button>
+          </div>
+
+          ${isReserve ? `
+            <div style="display:grid; grid-template-columns:1fr 0.85fr 1.15fr; gap:4px; background:var(--bg-page); padding:5px; border-radius:8px; border:1px solid var(--border); margin-bottom:6px;">
+              <input type="date" class="select-input" style="padding:4px 6px; font-size:0.74rem;" min="${getTodayDateStr()}" value="${escapeHtml(state.posReserveDate)}" onchange="setPosOption('posReserveDate', this.value)">
+              <input type="time" class="select-input" style="padding:4px 6px; font-size:0.74rem;" value="${escapeHtml(state.posReserveTime)}" onchange="state.posReserveTime=this.value">
+              <input type="tel" class="select-input" style="padding:4px 6px; font-size:0.74rem; border-color:var(--red);" placeholder="📱 電話(必填)" value="${escapeHtml(state.posCustomerPhone)}" oninput="state.posCustomerPhone=this.value">
             </div>
           ` : ''}
+
+          <!-- 付款方式 (現場現金 / LINE Pay / 街口支付) -->
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:5px; margin-bottom:6px;">
+            ${['現場現金', 'LINE Pay', '街口支付'].map(pay => {
+              const disabled = (pay === '現場現金' && isCashForbidden);
+              return `
+                <button type="button" class="pos-chip-btn ${state.posPayment === pay ? 'active' : ''}" ${disabled ? 'disabled style="opacity:0.35; cursor:not-allowed;"' : ''} onclick="setPosOption('posPayment', '${pay}')">
+                  ${pay === '現場現金' && isCashForbidden ? '現金(禁)' : pay}
+                </button>
+              `;
+            }).join('')}
+          </div>
+
+          ${state.posPayment === '現場現金' ? `
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; margin-bottom:6px;">
+              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(${finalTotal})">剛好</button>
+              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(100)">$100</button>
+              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(500)">$500</button>
+              <button type="button" class="pos-chip-btn" onclick="setPosQuickCash(1000)">$1000</button>
+            </div>
+            <button type="button" onclick="openPosCashNumpadModal()" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-radius:10px; border:1.5px dashed var(--brand); background:var(--brand-light); color:var(--brand-dark); font-size:0.8rem; font-weight:900; margin-bottom:8px;">
+              <span>🔢 實收: NT$ ${state.posCashReceived !== '' ? escapeHtml(state.posCashReceived) : `${finalTotal} (點此輸入)`}</span>
+              <span style="color:${isCashInsufficient ? 'var(--red)' : 'var(--green)'};">
+                ${isCashInsufficient ? `不足 $${finalTotal - cashReceivedNum}` : `找零 NT$ ${changeAmount}`} ➔
+              </span>
+            </button>
+          ` : ''}
+
           <div style="display:flex; justify-content:space-between; align-items:baseline; margin:4px 0 8px; padding-top:4px; border-top:1px solid var(--border);">
-            <span style="font-size:0.88rem; font-weight:900;">應收總計 (${escapeHtml(state.posPayment)})</span>
+            <span style="font-size:0.86rem; font-weight:900;">應收總計 ${cutleryFee > 0 ? `(含餐具+$${cutleryFee})` : ''}</span>
             <span style="font-size:1.35rem; font-weight:950; color:var(--red);">NT$ ${finalTotal}</span>
           </div>
 
@@ -3043,8 +3170,8 @@ function renderOrderPayModalContent() {
       </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-bottom:10px;">
-      ${['現場現金', 'LINE Pay', '街口支付', 'Apple Pay'].map(m => `
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-bottom:10px;">
+      ${['現場現金', 'LINE Pay', '街口支付'].map(m => `
         <button type="button" class="pos-chip-btn ${state.payingOrderMethod === m ? 'active' : ''}" onclick="setOrderPayMethod('${m}')">${m}</button>
       `).join('')}
     </div>
@@ -3578,26 +3705,87 @@ function renderMerchantSettingsPanel(store) {
       ` : ''}
 
       ${sub === 'line' ? `
-        <!-- 子頁籤 3：LINE Developers Messaging API 設定 & 評審流量模擬 -->
+        <!-- 子頁籤 3：LINE Login OAuth 2.1 + Flex Message 推播設定 (店家可選是否綁定自己的官方 LINE，不綁定則自動使用系統主預設官方 LINE) -->
         <div class="chart-card" style="border:1.5px solid #86EFAC; background:#F0FDF4;">
-          <h3 style="font-size:1.05rem; font-weight:900; color:#065F46; margin-bottom:6px;">💚 LINE Developers Messaging API 官方帳號推播設定</h3>
-          <p style="font-size:0.8rem; color:#047857; line-height:1.5; margin-bottom:14px;">
-            請於 <a href="https://developers.line.biz/" target="_blank" style="text-decoration:underline; font-weight:800;">LINE Developers Console</a> 建立 Messaging API Channel，並將 <strong>Webhook URL</strong> 設為您的 GAS 網址：<br>
-            <code style="background:#FFFFFF; padding:3px 8px; border-radius:6px; border:1px solid #A7F3D0; font-size:0.75rem; user-select:all;">${escapeHtml(GAS_URL)}</code>
+          <h3 style="font-size:1.05rem; font-weight:900; color:#065F46; margin-bottom:6px;">
+            💚 LINE 官方帳號推播設定（${escapeHtml(store.name)}）
+          </h3>
+          <p style="font-size:0.82rem; color:#047857; line-height:1.5; margin-bottom:14px;">
+            採用 <strong>LINE Login OAuth 2.1 授權綁定 + Messaging API Flex Message 卡片推播（免設定 Webhook）</strong>。<br>
+            各店家可自由選擇是否綁定自己的官方 LINE；<strong>若店家選擇不綁定，系統將自動使用平台預設的總官方 LINE 帳號進行綁定與推播！</strong>
           </p>
 
-          <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px; margin-bottom:12px;">
-            <div>
-              <label class="field-label">🤖 LINE 官方帳號 ID (Bot Basic ID)</label>
-              <input type="text" id="cfgLineBotBasicId" class="select-input" placeholder="例如：@123abcde" value="${escapeHtml(state.lineProfile.botBasicId || '')}">
-            </div>
-            <div>
-              <label class="field-label">🔑 Messaging API Channel Access Token (Long-lived)</label>
-              <input type="password" id="cfgLineAccessToken" class="select-input" placeholder="貼上 LINE Developers Channel Access Token">
-            </div>
+          <!-- 選擇模式：使用系統預設官方 LINE vs 綁定本店專屬官方 LINE -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+            <label class="option-label-row ${!store.useCustomLineOa ? 'checked' : ''}" style="background:#FFFFFF; margin-bottom:0;" onclick="toggleStoreCustomLineMode(false)">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <input type="radio" name="storeLineOaMode" ${!store.useCustomLineOa ? 'checked' : ''} style="width:18px; height:18px; accent-color:#06C755;">
+                <div>
+                  <div style="font-weight:900; color:var(--text-primary);">🌐 使用系統預設官方 LINE (預設推薦)</div>
+                  <div style="font-size:0.74rem; color:var(--text-secondary);">店家免申請，直接使用平台主的官方 LINE 推播</div>
+                </div>
+              </div>
+            </label>
+
+            <label class="option-label-row ${store.useCustomLineOa ? 'checked' : ''}" style="background:#FFFFFF; margin-bottom:0;" onclick="toggleStoreCustomLineMode(true)">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <input type="radio" name="storeLineOaMode" ${store.useCustomLineOa ? 'checked' : ''} style="width:18px; height:18px; accent-color:#06C755;">
+                <div>
+                  <div style="font-weight:900; color:var(--text-primary);">🏪 綁定「${escapeHtml(store.name)}」專屬官方 LINE</div>
+                  <div style="font-size:0.74rem; color:var(--text-secondary);">使用此店家獨立的 LINE Login 與 Messaging API</div>
+                </div>
+              </div>
+            </label>
           </div>
 
-          <button type="button" class="btn-tip-action" style="background:#00B900;" onclick="saveLineMessagingConfig()">💾 儲存 LINE Developers 設定至雲端</button>
+          ${store.useCustomLineOa ? `
+            <div style="background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #86EFAC; margin-bottom:12px;">
+              <div style="font-size:0.86rem; font-weight:900; color:#065F46; margin-bottom:10px;">
+                🏪 「${escapeHtml(store.name)}」專屬官方 LINE 參數設定
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                <div>
+                  <label class="field-label">LINE Login Channel ID (Client ID)</label>
+                  <input type="text" id="cfgStoreLineClientId" class="select-input" placeholder="例如：2009184950" value="${escapeHtml(store.customLineClientId || '')}">
+                </div>
+                <div>
+                  <label class="field-label">LINE Login Channel Secret</label>
+                  <input type="password" id="cfgStoreLineClientSecret" class="select-input" placeholder="輸入 LINE Login Channel Secret" value="${escapeHtml(store.customLineClientSecret || '')}">
+                </div>
+              </div>
+              <div>
+                <label class="field-label">Messaging API Channel Access Token (Long-lived)</label>
+                <input type="password" id="cfgStoreLineChannelToken" class="select-input" placeholder="貼上本店 Messaging API Channel Access Token" value="${escapeHtml(store.customLineChannelToken || '')}">
+              </div>
+            </div>
+          ` : `
+            <div style="background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #A7F3D0; margin-bottom:12px;">
+              <div style="font-size:0.86rem; font-weight:900; color:#065F46; margin-bottom:6px;">
+                ✅ 目前「${escapeHtml(store.name)}」已啟用【系統主預設官方 LINE】代管推播
+              </div>
+              <p style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:10px;">
+                當顧客於本店點餐、餐點完成叫號或預訂逾期時，將自動由系統總官方帳號發送精美 Flex Message 通知卡片。下方可更新系統主預設官方 LINE 參數：
+              </p>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                <div>
+                  <label class="field-label">系統預設 LINE Login Channel ID</label>
+                  <input type="text" id="cfgSysLineClientId" class="select-input" placeholder="預設：2011878497" value="${escapeHtml(state.lineProfile.customClientId || DEFAULT_LINE_CLIENT_ID)}">
+                </div>
+                <div>
+                  <label class="field-label">系統預設 LINE Login Channel Secret (選填)</label>
+                  <input type="password" id="cfgSysLineClientSecret" class="select-input" placeholder="留空則使用 GAS 內建預設值">
+                </div>
+              </div>
+              <div>
+                <label class="field-label">系統預設 Messaging API Channel Access Token (選填)</label>
+                <input type="password" id="cfgLineAccessToken" class="select-input" placeholder="留空則使用 GAS 內建預設 Token">
+              </div>
+            </div>
+          `}
+
+          <button type="button" class="btn-line" style="padding:11px 18px; font-size:0.88rem;" onclick="saveLineMessagingConfig()">
+            💾 儲存 LINE 官方帳號推播設定
+          </button>
         </div>
 
         <div class="chart-card">
@@ -3889,37 +4077,68 @@ async function triggerTrafficSimulation() {
   }
 }
 
-async function saveLineMessagingConfig() {
-  const botBasicId = document.getElementById('cfgLineBotBasicId')?.value.trim() || '@mealflow_scu';
-  const channelAccessToken = document.getElementById('cfgLineAccessToken')?.value.trim() || '';
-
-  state.lineProfile.botBasicId = botBasicId;
-  if (channelAccessToken) {
-    state.lineProfile.channelAccessToken = channelAccessToken;
-  }
-  saveLineProfile(state.lineProfile);
-  showToast('✅ 已儲存 LINE Developers Messaging API 設定！');
-
-  try {
-    await fetch(GAS_URL, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'saveLineDevConfig',
-        botBasicId,
-        channelAccessToken
-      })
-    });
-  } catch (e) {}
+function toggleStoreCustomLineMode(useCustom) {
+  const store = state.stores.find(s => s.id === state.merchantStoreId);
+  if (!store) return;
+  store.useCustomLineOa = Boolean(useCustom);
+  saveLocalStores(state.stores);
+  renderMerchantSettingsPanel(store);
 }
 
-// ==================== 7. UI 輔助函式 ====================
-function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+async function saveLineMessagingConfig() {
+  const store = state.stores.find(s => s.id === state.merchantStoreId);
+  if (!store) return;
+
+  if (store.useCustomLineOa) {
+    store.customLineClientId = document.getElementById('cfgStoreLineClientId')?.value.trim() || '';
+    store.customLineClientSecret = document.getElementById('cfgStoreLineClientSecret')?.value.trim() || '';
+    store.customLineChannelToken = document.getElementById('cfgStoreLineChannelToken')?.value.trim() || '';
+    saveLocalStores(state.stores);
+    showToast(`✅ 已儲存「${store.name}」專屬官方 LINE 推播設定！`);
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'updateStoreConfig',
+          storeId: store.id,
+          useCustomLineOa: true,
+          customLineClientId: store.customLineClientId,
+          customLineClientSecret: store.customLineClientSecret,
+          customLineChannelToken: store.customLineChannelToken
+        })
+      });
+    } catch (e) {}
+  } else {
+    const sysClientId = document.getElementById('cfgSysLineClientId')?.value.trim() || DEFAULT_LINE_CLIENT_ID;
+    const sysClientSecret = document.getElementById('cfgSysLineClientSecret')?.value.trim() || '';
+    const sysChannelToken = document.getElementById('cfgLineAccessToken')?.value.trim() || '';
+
+    state.lineProfile.customClientId = sysClientId;
+    try { localStorage.setItem('mealflow_system_line_client_id', sysClientId); } catch (e) {}
+    if (sysChannelToken) {
+      state.lineProfile.channelAccessToken = sysChannelToken;
+    }
+    saveLineProfile(state.lineProfile);
+    store.useCustomLineOa = false;
+    saveLocalStores(state.stores);
+
+    showToast(`✅ 「${store.name}」已設為使用系統預設官方 LINE 推播！`);
+    try {
+      await fetch(GAS_URL, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'saveLineDevConfig',
+          storeId: store.id,
+          useCustomLineOa: false,
+          systemClientId: sysClientId,
+          systemClientSecret: sysClientSecret,
+          channelAccessToken: sysChannelToken
+        })
+      });
+    } catch (e) {}
+  }
 }
