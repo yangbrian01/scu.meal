@@ -596,66 +596,88 @@ body.store-mode-active .container {
   font-weight: 900;
 }
 
-/* ==================== 店家端現代化頂部導覽與美型 POS 介面 (/store/) ==================== */
-.store-top-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+/* ==================== 店家端現代化左側白色圖示欄 + 美型 POS 介面 (/store/) ==================== */
+.store-shell-layout {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.store-left-rail {
   background: #FFFFFF;
-  padding: 8px 12px;
-  border-radius: 16px;
+  border-radius: 20px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.store-nav-pills {
+  padding: 12px 8px;
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: 72px;
+  height: calc(100dvh - 82px);
 }
-.store-nav-tab {
+
+.store-rail-btn {
+  position: relative;
+  width: 56px;
+  height: 58px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  padding: 8px 16px;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  font-weight: 800;
-  display: inline-flex;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  transition: 0.15s;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  transition: all 0.16s ease;
 }
-.store-nav-tab:hover {
+.store-rail-btn .rail-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.store-rail-btn:hover {
   background: var(--bg-page);
   color: var(--text-primary);
+  transform: translateY(-1px);
 }
-.store-nav-tab.active {
+.store-rail-btn.active {
   background: var(--brand);
   color: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(255, 90, 31, 0.26);
+  box-shadow: 0 6px 14px rgba(255, 90, 31, 0.28);
 }
 .tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   background: #EF4444;
   color: #FFFFFF;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 900;
-  padding: 1px 7px;
+  padding: 1px 5px;
   border-radius: 999px;
+  line-height: 1.2;
 }
-.store-nav-tab.active .tab-badge {
+.store-rail-btn.active .tab-badge {
   background: #FFFFFF;
   color: var(--brand-dark);
 }
 
-/* 店家 POS 點餐雙欄工作區：剛好塞滿一頁平板高度 (calc(100dvh - 136px))，不需外層捲動 */
+.store-stage-area {
+  min-width: 0;
+  width: 100%;
+}
+
+/* 店家 POS 點餐雙欄工作區：剛好塞滿一頁平板高度 (calc(100dvh - 82px))，不需外層捲動 */
 .pos-modern-workspace {
   display: grid;
   grid-template-columns: 1fr 390px;
   gap: 14px;
-  height: calc(100dvh - 136px);
+  height: calc(100dvh - 82px);
   min-height: 480px;
   overflow: hidden;
 }
@@ -976,6 +998,65 @@ body.store-mode-active .container {
   border: 1px solid var(--border);
   padding: 18px;
   box-shadow: var(--shadow-sm);
+  position: relative;
+}
+
+/* 互動式圖表動畫與懸浮提示框 (Hover / Touch Interactive Charts) */
+.chart-interactive-bar {
+  cursor: pointer;
+  transition: opacity 0.18s ease, filter 0.18s ease, transform 0.18s ease;
+  transform-box: fill-box;
+  transform-origin: bottom center;
+}
+.chart-interactive-bar:hover,
+.chart-interactive-bar.active-bar {
+  filter: brightness(1.12) drop-shadow(0 4px 10px rgba(255, 90, 31, 0.35));
+  transform: scaleY(1.04);
+}
+.chart-interactive-slice {
+  cursor: pointer;
+  transition: stroke-width 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+}
+.chart-interactive-slice:hover,
+.chart-interactive-slice.active-slice {
+  stroke-width: 8.4 !important;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.22));
+}
+.chart-interactive-point {
+  cursor: pointer;
+  transition: r 0.18s ease, stroke-width 0.18s ease, filter 0.18s ease;
+}
+.chart-interactive-point:hover,
+.chart-interactive-point.active-point {
+  r: 7.5px;
+  stroke-width: 3.5px;
+  filter: drop-shadow(0 2px 8px rgba(16, 185, 129, 0.5));
+}
+.legend-interactive-row {
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.legend-interactive-row:hover,
+.legend-interactive-row.active-legend {
+  background: var(--brand-light);
+  transform: translateX(3px);
+}
+.chart-floating-tooltip {
+  position: fixed;
+  z-index: 9950;
+  background: rgba(17, 24, 39, 0.95);
+  color: #FFFFFF;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: none;
+  min-width: 170px;
 }
 
 /* ==================== 彈窗共用遮罩與嚴格圖層順序 ==================== */
@@ -1176,30 +1257,6 @@ body.store-mode-active .container {
   background: #05B34C;
 }
 
-.line-push-container {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 9900;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 360px;
-  width: calc(100vw - 32px);
-  pointer-events: none;
-}
-.line-push-card {
-  pointer-events: auto;
-  background: #FFFFFF;
-  border-left: 6px solid #06C755;
-  border-radius: 14px;
-  padding: 12px 14px;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
-  border-top: 1px solid #E5E7EB;
-  border-right: 1px solid #E5E7EB;
-  border-bottom: 1px solid #E5E7EB;
-  animation: fadeIn 0.25s ease;
-}
 .ring-bell-anim {
   display: inline-block;
   animation: shakeRing 0.8s infinite;
@@ -1220,6 +1277,16 @@ body.store-mode-active .container {
   body.pos-no-scroll {
     height: auto;
     overflow: auto;
+  }
+  .store-shell-layout {
+    grid-template-columns: 1fr;
+  }
+  .store-left-rail {
+    flex-direction: row;
+    justify-content: space-around;
+    height: auto;
+    position: static;
+    padding: 8px;
   }
   .pos-modern-workspace {
     grid-template-columns: 1fr;

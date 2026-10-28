@@ -12,10 +12,9 @@
 <body>
 
   <div id="toast" class="toast"></div>
-  <!-- LINE Messaging API 即時推播通知懸浮容器 -->
-  <div id="linePushContainer" class="line-push-container"></div>
+  <div id="analyticsChartTooltip" class="chart-floating-tooltip"></div>
 
-  <!-- 頂部導覽列（當處於 /store/ 全螢幕 POS 模式時由 CSS 自動隱藏，最大化平板收銀畫面） -->
+  <!-- 頂部導覽列 -->
   <header class="app-header">
     <div class="header-inner">
       <div class="brand-title-group">
@@ -31,7 +30,14 @@
       </div>
 
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <button type="button" class="btn-line" style="padding:5px 11px; font-size:0.76rem;" onclick="openLineBindModal()">
+        <!-- 店家模式專用：右上角直接切換店鋪與同步雲端（學生模式隱藏） -->
+        <div id="headerStoreControls" style="display:none; align-items:center; gap:8px;">
+          <select id="storeTopSwitcher" class="select-input" style="width:auto; min-width:210px; padding:6px 12px; font-weight:800; font-size:0.84rem;" onchange="switchMerchantStore(this.value)"></select>
+          <button type="button" class="filter-chip" style="padding:6px 12px;" onclick="syncCloud(true)">🔄 同步雲端</button>
+        </div>
+
+        <!-- 學生模式專用：綁定 LINE / Email 取餐通知（店家模式自動隱藏） -->
+        <button type="button" id="headerLineBindBtn" class="btn-line" style="padding:5px 11px; font-size:0.76rem;" onclick="openLineBindModal()">
           <span id="headerLineBtnText">💬 綁定 LINE 通知</span>
         </button>
         <div class="campus-switcher" id="headerCampusSwitcher" style="display:none;">
@@ -102,37 +108,38 @@
       <div id="singleTicketContainer"></div>
     </section>
 
-    <!-- ==================== 路由 4：現代化美型店家 POS + 訂單分天 + AI 分析 + 店務設定 (/store/) ==================== -->
+    <!-- ==================== 路由 4：現代化美型店家 POS + 左側垂直圖示導覽 + 訂單分天 + 互動式 AI 分析 (/store/) ==================== -->
     <section id="viewStore" class="view-section">
-      <!-- 店家端頂部美型導覽列 -->
-      <div class="store-top-nav">
-        <div class="store-nav-pills">
-          <button type="button" class="store-nav-tab active" id="railBtn-pos" onclick="switchStoreTabMode('pos')">
-            <span>🖥️</span> 櫃檯點餐 (POS)
+      <div class="store-shell-layout">
+        <!-- 左側現代化白色垂直圖示導覽欄 -->
+        <aside class="store-left-rail">
+          <button type="button" class="store-rail-btn active" id="railBtn-pos" onclick="switchStoreTabMode('pos')" title="櫃檯點餐 (POS)">
+            <span class="rail-icon">🖥️</span>
+            <span>點餐</span>
           </button>
-          <button type="button" class="store-nav-tab" id="railBtn-kds" onclick="switchStoreTabMode('kds')">
-            <span>📋</span> 訂單管理
+          <button type="button" class="store-rail-btn" id="railBtn-kds" onclick="switchStoreTabMode('kds')" title="訂單管理">
+            <span class="rail-icon">📋</span>
+            <span>訂單</span>
             <span id="railKdsBadge" class="tab-badge" style="display:none;">0</span>
           </button>
-          <button type="button" class="store-nav-tab" id="railBtn-analytics" onclick="switchStoreTabMode('analytics')">
-            <span>📊</span> AI 營運分析
+          <button type="button" class="store-rail-btn" id="railBtn-analytics" onclick="switchStoreTabMode('analytics')" title="AI 營運分析">
+            <span class="rail-icon">📊</span>
+            <span>分析</span>
           </button>
-          <button type="button" class="store-nav-tab" id="railBtn-settings" onclick="switchStoreTabMode('settings')">
-            <span>⚙️</span> 店務設定
+          <button type="button" class="store-rail-btn" id="railBtn-settings" onclick="switchStoreTabMode('settings')" title="店務設定">
+            <span class="rail-icon">⚙️</span>
+            <span>設定</span>
           </button>
-        </div>
+        </aside>
 
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <select id="storeTopSwitcher" class="select-input" style="width:auto; min-width:190px; padding:6px 10px; font-weight:800; font-size:0.84rem;" onchange="switchMerchantStore(this.value)"></select>
-          <button type="button" class="filter-chip" style="padding:6px 12px;" onclick="syncCloud(true)">🔄 同步雲端</button>
+        <!-- 右側主工作區：僅 storePanel-pos 鎖定一頁不捲動，其餘面板可自由上下捲動 -->
+        <div class="store-stage-area">
+          <div id="storePanel-pos" style="display:block;"></div>
+          <div id="storePanel-kds" style="display:none;"></div>
+          <div id="storePanel-analytics" style="display:none;"></div>
+          <div id="storePanel-settings" style="display:none;"></div>
         </div>
       </div>
-
-      <!-- 四大子面板：僅 storePanel-pos 鎖定一頁不捲動，其餘面板可自由上下捲動 -->
-      <div id="storePanel-pos" style="display:block;"></div>
-      <div id="storePanel-kds" style="display:none;"></div>
-      <div id="storePanel-analytics" style="display:none;"></div>
-      <div id="storePanel-settings" style="display:none;"></div>
     </section>
 
   </main>
@@ -244,21 +251,25 @@
 
         <div style="background:#F8FAFC; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px;">
           <div style="font-size:0.8rem; font-weight:900; color:var(--text-primary); margin-bottom:8px;">
-            🔑 開發測試 / 直接填入 LINE User ID 綁定
+            📧 綁定 Email 免費無限量取餐通知 / 或手動填入 LINE User ID
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:8px; margin-bottom:8px;">
+          <div style="display:grid; grid-template-columns:1fr 1.3fr; gap:8px; margin-bottom:8px;">
             <div>
               <label class="field-label">👤 顯示名稱</label>
               <input type="text" id="lineInputName" class="select-input" placeholder="例如：王小明">
             </div>
             <div>
-              <label class="field-label">🆔 LINE User ID (U開頭 33 碼)</label>
-              <input type="text" id="lineInputId" class="select-input" placeholder="U1234567890abcdef...">
+              <label class="field-label">📧 Email 信箱 (免額度限制推薦)</label>
+              <input type="email" id="lineInputEmail" class="select-input" placeholder="student@scu.edu.tw">
             </div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <label class="field-label">🆔 LINE User ID (選填，U開頭 33 碼)</label>
+            <input type="text" id="lineInputId" class="select-input" placeholder="若已用上方按鈕授權會自動帶入">
           </div>
           <div style="display:flex; gap:8px;">
             <button type="button" class="btn-line" style="flex:1; justify-content:center; padding:9px;" onclick="saveLineBindConfig()">
-              💚 儲存綁定並發送測試通知
+              💾 儲存通知設定
             </button>
             <button type="button" class="filter-chip" onclick="requestBrowserNotificationPermission()">
               🔔 開啟網頁震動響鈴

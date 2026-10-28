@@ -7,7 +7,9 @@
  */
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzVXQRKZfnhgM_BhW6pgy1VOCg7YmCdfnAdHOS_9Tt7agxQa2r69hwg1UGL73gpoVwp/exec';
-const DEFAULT_LINE_CLIENT_ID = localStorage.getItem('mealflow_system_line_client_id') || '2011878497';
+const DEFAULT_LINE_CLIENT_ID = localStorage.getItem('mealflow_system_line_client_id') || '2012260287';
+const DEFAULT_LINE_CLIENT_SECRET = 'e78839eba4d3aa7d4ec65633924de226';
+const DEFAULT_LINE_CHANNEL_TOKEN = 'rPsZmKQjS70tezeGNsf5+lo1QZvRSCndTCG+iCDHsTGCOSqomxt5uVv3AOM4qRq384mKSkWeK+OatPl3p+NRBnuSB8I5wAn8dRR5GAUatNxM44Gc2POkD6pTHtAFlmahEeYbstNW0s06t4S1NkAsZAdB04t89/1O/w1cDnyilFU=';
 
 const STORE_ICONS = {
   'S01': '🍙', 'S02': '🍱', 'S03': '🥟', 'S04': '🍗',
@@ -181,26 +183,85 @@ function saveLocalStores(stores) {
 
 function loadCachedOrders() {
   try {
-    const raw = localStorage.getItem('mealflow_orders_v7');
+    const raw = localStorage.getItem('mealflow_orders_v8');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch (e) {}
   const today = getTodayDateStr();
+  const yesterday = getDateOffsetStr(-1);
+  const minus2 = getDateOffsetStr(-2);
   const plus3 = getDateOffsetStr(3);
   const deadline = getDateOffsetStr(1);
   return [
     {
       orderId: 'ORD-8f92a1c4b7e0', pickupNumber: 'S208', storeId: 'S02', storeName: '雙溪-丼物園',
       studentId: '📱 掃碼點餐', studentName: '外帶自取',
-      itemsJson: JSON.stringify([{ id: 'M04', name: '炙燒起司牛五花丼 [主食份量:大盛加飯, 辣度選擇:小辣]', price: 125, qty: 1 }]),
-      subtotal: 125, cutleryFee: 0, needCutlery: false, discount: 0, finalTotal: 125,
+      itemsJson: JSON.stringify([
+        { id: 'M04', name: '炙燒起司牛五花丼 [主食份量:大盛加飯, 辣度選擇:小辣]', price: 125, qty: 1 },
+        { id: 'M23', name: '靜岡無糖玄米綠茶', price: 30, qty: 1 }
+      ]),
+      subtotal: 155, cutleryFee: 0, needCutlery: false, discount: 0, finalTotal: 155,
       promoApplied: '🎁 AI分流招待：免費溫泉蛋乙顆',
       pickupTimeSlot: '⚡ 立即製作 (約5分)', paymentMethod: 'LINE Pay', status: '製作中',
       isReservation: false, pickupDate: today, pickupTime: '12:10', customerPhone: '',
       paymentDeadline: '', paymentStatus: '已付款', notifyCount: 0,
-      isDivertedOrder: true, createdAt: '12:02:15'
+      isDivertedOrder: true, createdAt: '12:08:15'
+    },
+    {
+      orderId: 'ORD-7a41c8b021e9', pickupNumber: 'S205', storeId: 'S02', storeName: '雙溪-丼物園',
+      studentId: '🖥️ 現場POS', studentName: '內用自取 (實收$200/找零$25)',
+      itemsJson: JSON.stringify([
+        { id: 'M05', name: '黃金厚切豬排滑蛋丼 [主食份量:正常飯量]', price: 120, qty: 1 },
+        { id: 'M19', name: '日式唐揚炸雞 (5塊) [調味粉:原味胡椒]', price: 55, qty: 1 }
+      ]),
+      subtotal: 175, cutleryFee: 0, needCutlery: false, discount: 0, finalTotal: 175,
+      promoApplied: '現場POS點餐',
+      pickupTimeSlot: '⚡ 現場立即製作', paymentMethod: '現場現金', status: '已完成',
+      isReservation: false, pickupDate: today, pickupTime: '11:35', customerPhone: '',
+      paymentDeadline: '', paymentStatus: '已付款', notifyCount: 1,
+      isDivertedOrder: false, createdAt: '11:32:10'
+    },
+    {
+      orderId: 'ORD-6d19f2e490a3', pickupNumber: 'S202', storeId: 'S02', storeName: '雙溪-丼物園',
+      studentId: '📱 掃碼點餐', studentName: '內用自取',
+      itemsJson: JSON.stringify([
+        { id: 'M06', name: '讚岐胡麻冷烏龍麵 [麵條份量:加麵大碗]', price: 110, qty: 2 }
+      ]),
+      subtotal: 220, cutleryFee: 0, needCutlery: false, discount: 0, finalTotal: 220,
+      promoApplied: '🎁 AI分流招待：免費溫泉蛋乙顆',
+      pickupTimeSlot: '⚡ 立即製作 (約5分)', paymentMethod: '街口支付', status: '已完成',
+      isReservation: false, pickupDate: today, pickupTime: '10:45', customerPhone: '',
+      paymentDeadline: '', paymentStatus: '已付款', notifyCount: 1,
+      isDivertedOrder: true, createdAt: '10:42:00'
+    },
+    {
+      orderId: 'ORD-5b83e1a904c2', pickupNumber: 'S198', storeId: 'S02', storeName: '雙溪-丼物園',
+      studentId: '📱 掃碼點餐', studentName: '外帶自取・🥢 需一次性餐具(+$1)',
+      itemsJson: JSON.stringify([
+        { id: 'M04', name: '炙燒起司牛五花丼 [主食份量:正常飯量]', price: 115, qty: 2 },
+        { id: 'M19', name: '日式唐揚炸雞 (5塊)', price: 55, qty: 1 }
+      ]),
+      subtotal: 285, cutleryFee: 1, needCutlery: true, discount: 0, finalTotal: 286,
+      promoApplied: '🎁 AI分流招待：免費溫泉蛋乙顆',
+      pickupTimeSlot: '⚡ 立即製作 (約5分)', paymentMethod: 'LINE Pay', status: '已完成',
+      isReservation: false, pickupDate: yesterday, pickupTime: '12:20', customerPhone: '',
+      paymentDeadline: '', paymentStatus: '已付款', notifyCount: 1,
+      isDivertedOrder: true, createdAt: '12:18:00'
+    },
+    {
+      orderId: 'ORD-4e20d7c381f5', pickupNumber: 'S186', storeId: 'S02', storeName: '雙溪-丼物園',
+      studentId: '🖥️ 現場POS', studentName: '內用自取',
+      itemsJson: JSON.stringify([
+        { id: 'M05', name: '黃金厚切豬排滑蛋丼', price: 120, qty: 2 }
+      ]),
+      subtotal: 240, cutleryFee: 0, needCutlery: false, discount: 0, finalTotal: 240,
+      promoApplied: '現場POS點餐',
+      pickupTimeSlot: '⚡ 現場立即製作', paymentMethod: '現場現金', status: '已完成',
+      isReservation: false, pickupDate: minus2, pickupTime: '13:10', customerPhone: '',
+      paymentDeadline: '', paymentStatus: '已付款', notifyCount: 1,
+      isDivertedOrder: false, createdAt: '13:05:22'
     },
     {
       orderId: 'ORD-3c71b9e2d411', pickupNumber: 'S315', storeId: 'S02', storeName: '雙溪-丼物園',
@@ -218,30 +279,28 @@ function loadCachedOrders() {
 
 function saveCachedOrders(orders) {
   try {
-    localStorage.setItem('mealflow_orders_v7', JSON.stringify(orders.slice(0, 80)));
+    localStorage.setItem('mealflow_orders_v8', JSON.stringify(orders.slice(0, 120)));
   } catch (e) {}
 }
 
 function loadLineProfile() {
   try {
-    const raw = localStorage.getItem('mealflow_line_profile_v7');
+    const raw = localStorage.getItem('mealflow_line_profile_v8');
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  const randomCode = String(Math.floor(1000 + Math.random() * 9000));
   return {
     isBound: false,
-    bindCode: randomCode,
     lineDisplayName: '',
     lineUserId: '',
-    botBasicId: localStorage.getItem('mealflow_line_bot_id') || '@mealflow_scu',
-    channelAccessToken: localStorage.getItem('mealflow_line_token') || '',
-    liffId: localStorage.getItem('mealflow_line_liff') || ''
+    email: '',
+    customClientId: DEFAULT_LINE_CLIENT_ID,
+    channelAccessToken: DEFAULT_LINE_CHANNEL_TOKEN
   };
 }
 
 function saveLineProfile(profile) {
   try {
-    localStorage.setItem('mealflow_line_profile_v7', JSON.stringify(profile));
+    localStorage.setItem('mealflow_line_profile_v8', JSON.stringify(profile));
   } catch (e) {}
 }
 
@@ -575,19 +634,23 @@ function requestBrowserNotificationPermission() {
 }
 
 /**
- * 透過 LINE Messaging API (VocabMaster 同款 Flex Message 卡片推播) 發送通知，
- * 若該店未綁定專屬官方 LINE，後端自動使用系統主預設官方 LINE 推播！
+ * 透過後端 GAS 發送真實 LINE Flex Message 卡片推播與免費無限額 Email 通知
+ * （已移除畫面上多餘的懸浮卡片，僅在後端發送真實 LINE / Email 並記錄於通知匣）
  */
 async function pushLineNotification(eventType, title, message, order = null) {
   const nowStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
   const targetUserId = (order && order.lineUserId) || state.lineProfile.lineUserId || '';
+  const targetEmail = (order && order.customerEmail) || state.lineProfile.email || '';
   const storeObj = order ? state.stores.find(s => s.id === order.storeId) : state.stores.find(s => s.id === state.selectedStoreId);
   const usingStoreCustomLine = Boolean(storeObj && storeObj.useCustomLineOa && storeObj.customLineChannelToken);
-  const senderLabel = usingStoreCustomLine ? `${storeObj.name} 官方 LINE` : 'MealFlow 系統官方 LINE';
+  const senderLabel = usingStoreCustomLine ? `${storeObj.name} 官方 LINE` : 'MealFlow 預設官方 LINE / Email';
 
-  const recipient = state.lineProfile.isBound
-    ? `${state.lineProfile.lineDisplayName || 'LINE用戶'} (${targetUserId.slice(0, 10)}...)`
-    : (order && order.customerPhone ? `手機 ${order.customerPhone}` : '尚未綁定 LINE 帳號');
+  const channels = [];
+  if (targetUserId && targetUserId.startsWith('U')) channels.push(`LINE (${targetUserId.slice(0, 8)}...)`);
+  if (targetEmail && targetEmail.includes('@')) channels.push(`Email (${targetEmail})`);
+  const recipient = channels.length > 0
+    ? channels.join(' + ')
+    : (order && order.customerPhone ? `手機 ${order.customerPhone}` : '尚未綁定');
 
   const logEntry = {
     id: 'LINE-' + Date.now() + '-' + Math.floor(Math.random() * 100),
@@ -603,35 +666,8 @@ async function pushLineNotification(eventType, title, message, order = null) {
   state.lineMessageLogs.unshift(logEntry);
   saveLineLogs(state.lineMessageLogs);
 
-  const container = document.getElementById('linePushContainer');
-  if (container) {
-    const card = document.createElement('div');
-    card.className = 'line-push-card';
-    card.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="background:#06C755; color:#fff; font-weight:900; font-size:0.68rem; padding:2px 7px; border-radius:999px;">${escapeHtml(senderLabel)}</span>
-          <strong style="font-size:0.84rem; color:#111827;">${escapeHtml(title)}</strong>
-        </div>
-        <span style="font-size:0.7rem; color:#9CA3AF;">${escapeHtml(nowStr)}</span>
-      </div>
-      <div style="font-size:0.8rem; color:#374151; line-height:1.45; margin-bottom:4px;">
-        ${escapeHtml(message)}
-      </div>
-      <div style="font-size:0.7rem; color:#059669; font-weight:700;">
-        👤 推播對象：${escapeHtml(recipient)}
-      </div>
-    `;
-    container.prepend(card);
-    setTimeout(() => {
-      card.style.opacity = '0';
-      card.style.transition = 'opacity 0.3s ease';
-      setTimeout(() => card.remove(), 300);
-    }, 6000);
-  }
-
-  // 若已綁定 LINE User ID (U開頭)，自動呼叫 GAS 後端發送 Flex Message 卡片推播
-  if (targetUserId && targetUserId.startsWith('U')) {
+  // 若有綁定 LINE User ID (U開頭) 或 Email 信箱，自動呼叫 GAS 後端發送 LINE Flex Message 卡片與 Email 通知
+  if ((targetUserId && targetUserId.startsWith('U')) || (targetEmail && targetEmail.includes('@'))) {
     const orderUrl = order
       ? `${window.location.origin}${getOrderPageUrl('id=' + encodeURIComponent(order.orderId))}`
       : window.location.href;
@@ -644,6 +680,7 @@ async function pushLineNotification(eventType, title, message, order = null) {
           action: 'sendLinePush',
           storeId: order ? order.storeId : (state.selectedStoreId || ''),
           lineUserId: targetUserId,
+          email: targetEmail,
           title,
           message,
           pickupNumber: order ? order.pickupNumber : '',
@@ -665,15 +702,18 @@ function openLineBindModal() {
   if (uidInput) uidInput.value = state.lineProfile.lineUserId || '';
   const nameInput = document.getElementById('lineInputName');
   if (nameInput) nameInput.value = state.lineProfile.lineDisplayName || '';
+  const emailInput = document.getElementById('lineInputEmail');
+  if (emailInput) emailInput.value = state.lineProfile.email || '';
 
   const statusBanner = document.getElementById('lineBindStatusBanner');
   if (statusBanner) {
-    if (state.lineProfile.isBound && state.lineProfile.lineUserId) {
+    if (state.lineProfile.isBound && (state.lineProfile.lineUserId || state.lineProfile.email)) {
       statusBanner.innerHTML = `
         <div style="background:#DCFCE7; border:1.5px solid #22C55E; border-radius:10px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <div>
-            <div style="font-size:0.84rem; font-weight:900; color:#166534;">✅ 已綁定 LINE 帳號：${escapeHtml(state.lineProfile.lineDisplayName || '東吳同學')}</div>
-            <div style="font-size:0.72rem; color:#15803D; font-family:monospace;">UID: ${escapeHtml(state.lineProfile.lineUserId)}</div>
+            <div style="font-size:0.84rem; font-weight:900; color:#166534;">✅ 已啟用通知：${escapeHtml(state.lineProfile.lineDisplayName || '東吳同學')}</div>
+            ${state.lineProfile.lineUserId ? `<div style="font-size:0.72rem; color:#15803D; font-family:monospace;">LINE UID: ${escapeHtml(state.lineProfile.lineUserId)}</div>` : ''}
+            ${state.lineProfile.email ? `<div style="font-size:0.72rem; color:#15803D;">📧 Email: ${escapeHtml(state.lineProfile.email)}</div>` : ''}
           </div>
           <button type="button" onclick="unbindLineAccount()" style="border:1px solid #DC2626; background:#FEF2F2; color:#DC2626; padding:5px 10px; border-radius:8px; font-size:0.74rem; font-weight:800;">解除綁定</button>
         </div>
@@ -767,32 +807,36 @@ async function checkLineOAuthCallbackOnLoad() {
 
 function saveLineBindConfig() {
   const name = document.getElementById('lineInputName')?.value.trim() || '東吳同學';
+  const email = document.getElementById('lineInputEmail')?.value.trim() || '';
   const rawUid = document.getElementById('lineInputId')?.value.trim() || '';
-  const lineId = rawUid || ('U' + Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
 
   state.lineProfile.isBound = true;
   state.lineProfile.lineDisplayName = name;
-  state.lineProfile.lineUserId = lineId;
+  state.lineProfile.email = email;
+  if (rawUid) {
+    state.lineProfile.lineUserId = rawUid;
+  }
   saveLineProfile(state.lineProfile);
 
   pushLineNotification(
     'BIND_SUCCESS',
-    '💚 LINE 帳號綁定成功',
-    `已綁定 ${name} (${lineId.slice(0, 10)}...)！當餐點完成、預訂需繳費或訂單異動時，將自動透過官方 LINE 推播通知您。`
+    '💚 取餐通知設定已儲存',
+    `已設定 ${name} 的取餐推播通知${email ? ` (Email: ${email})` : ''}！當餐點製作完成時將自動通知您。`
   );
   openLineBindModal();
   applyRouteView();
-  showToast('✅ LINE 通知綁定成功！');
+  showToast('✅ 通知設定已儲存！');
 }
 
 function unbindLineAccount() {
   state.lineProfile.isBound = false;
   state.lineProfile.lineDisplayName = '';
   state.lineProfile.lineUserId = '';
+  state.lineProfile.email = '';
   saveLineProfile(state.lineProfile);
   closeLineBindModal();
   applyRouteView();
-  showToast('已解除 LINE 綁定');
+  showToast('已解除通知綁定');
 }
 
 function renderLineLogsInModal() {
@@ -1060,11 +1104,22 @@ function applyRouteView() {
   enrichStoresAndAi();
   updateBodyScrollLock();
 
+  const lineBtn = document.getElementById('headerLineBindBtn');
+  if (lineBtn) {
+    // 店家模式 (/store/) 隱藏「💬 綁定 LINE 通知」按鈕，僅在學生模式顯示
+    lineBtn.style.display = (state.routeMode === 'store') ? 'none' : 'inline-flex';
+  }
+  const storeControls = document.getElementById('headerStoreControls');
+  if (storeControls) {
+    // 店家模式 (/store/) 於頂部導覽列直接顯示「切換店鋪下拉選單 + 同步雲端」
+    storeControls.style.display = (state.routeMode === 'store') ? 'inline-flex' : 'none';
+  }
+
   const lineBtnText = document.getElementById('headerLineBtnText');
   if (lineBtnText) {
     lineBtnText.innerText = state.lineProfile.isBound
-      ? `💚 已綁定 LINE (${state.lineProfile.lineDisplayName})`
-      : '💬 綁定 LINE 通知';
+      ? `💚 已綁定通知 (${state.lineProfile.lineDisplayName})`
+      : '💬 綁定 LINE / Email 通知';
   }
 
   const sections = ['viewPortal', 'viewOrder', 'viewTicket', 'viewStore'];
@@ -1973,6 +2028,7 @@ async function submitStudentCartOrder() {
     paymentStatus,
     notifyCount: 0,
     lineUserId: state.lineProfile.lineUserId || '',
+    customerEmail: state.lineProfile.email || '',
     isDivertedOrder: promoActive,
     createdAt: nowTime
   };
@@ -2659,14 +2715,8 @@ function renderPosCashierPanel(store) {
   const discount = (subtotal > 0 && promoActive && store.promoMode === 'discount') ? (Number(store.promoDiscount) || 10) : 0;
   const finalTotal = Math.max(0, subtotal + cutleryFee - discount);
 
+  // 店家 POS 現場點餐：因為顧客本人就在櫃檯現場，無論是立即出餐或預訂哪一天取餐，全部都可以直接收「現場現金」當場結清！
   const isReserve = state.posTimeMode === 'RESERVE';
-  const diffDays = isReserve ? calcDiffDaysFromToday(state.posReserveDate) : 0;
-  const isCashForbidden = isReserve && (diffDays === 1 || diffDays === 2);
-
-  if (isCashForbidden && state.posPayment === '現場現金') {
-    state.posPayment = 'LINE Pay';
-  }
-
   const cashReceivedNum = state.posCashReceived !== '' ? parseFloat(state.posCashReceived) : finalTotal;
   const changeAmount = Math.max(0, cashReceivedNum - finalTotal);
   const isCashInsufficient = state.posPayment === '現場現金' && state.posCashReceived !== '' && cashReceivedNum < finalTotal;
@@ -2773,16 +2823,13 @@ function renderPosCashierPanel(store) {
             </div>
           ` : ''}
 
-          <!-- 付款方式 (現場現金 / LINE Pay / 街口支付) -->
+          <!-- 付款方式 (店家 POS 現場點餐與現場預訂皆可直接付現！) -->
           <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:5px; margin-bottom:6px;">
-            ${['現場現金', 'LINE Pay', '街口支付'].map(pay => {
-              const disabled = (pay === '現場現金' && isCashForbidden);
-              return `
-                <button type="button" class="pos-chip-btn ${state.posPayment === pay ? 'active' : ''}" ${disabled ? 'disabled style="opacity:0.35; cursor:not-allowed;"' : ''} onclick="setPosOption('posPayment', '${pay}')">
-                  ${pay === '現場現金' && isCashForbidden ? '現金(禁)' : pay}
-                </button>
-              `;
-            }).join('')}
+            ${['現場現金', 'LINE Pay', '街口支付'].map(pay => `
+              <button type="button" class="pos-chip-btn ${state.posPayment === pay ? 'active' : ''}" onclick="setPosOption('posPayment', '${pay}')">
+                ${pay}
+              </button>
+            `).join('')}
           </div>
 
           ${state.posPayment === '現場現金' ? `
@@ -2855,9 +2902,9 @@ async function submitMerchantPosOrder() {
     };
   });
 
-  const isLongTermCash = isReserve && diffDays >= 3 && state.posPayment === '現場現金';
-  const paymentDeadline = isLongTermCash ? getDateOffsetFromStr(state.posReserveDate, -2) : '';
-  const paymentStatus = '已付款'; // 現場 POS 結帳預設當場收清或線上收訖
+  // 店家 POS 預訂因為顧客在現場直接付款，不論預訂哪一天皆當場結清 (已付款)，無須設定兩天前繳費期限
+  const paymentDeadline = '';
+  const paymentStatus = '已付款';
   const pickupTimeSlot = isReserve
     ? `📅 預訂 ${state.posReserveDate} ${state.posReserveTime}`
     : `⚡ 現場立即製作`;
@@ -3345,11 +3392,82 @@ function speakOrder(text, extraText = '') {
   window.speechSynthesis.speak(utter);
 }
 
-// ==================== 6.3 AI 營運與備料智慧分析儀表板 (日/週/月 柱狀圖、圓餅圖、折線圖) ====================
+// ==================== 6.3 AI 營運與備料智慧分析儀表板 (100% 真實訂單驅動 + 滑鼠/觸控互動式圖表與點擊穿透查詢) ====================
 function setAnalyticsPeriod(period) {
   state.analyticsPeriod = period;
+  state.analyticsSelectedFilter = null;
   const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
   if (store) renderMerchantAnalyticsPanel(store);
+}
+
+function showAnalyticsTooltip(evt, title, line1, line2 = '') {
+  const tip = document.getElementById('analyticsChartTooltip');
+  if (!tip) return;
+  tip.innerHTML = `
+    <div style="font-weight:900; color:#FBBF24; margin-bottom:2px;">${escapeHtml(title)}</div>
+    <div>${escapeHtml(line1)}</div>
+    ${line2 ? `<div style="font-size:0.72rem; color:#CBD5E1; margin-top:2px;">${escapeHtml(line2)}</div>` : ''}
+  `;
+  tip.classList.add('show');
+  const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+  const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+  const left = Math.min(window.innerWidth - 220, Math.max(12, clientX + 14));
+  const top = Math.max(12, clientY - 65);
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+}
+
+function hideAnalyticsTooltip() {
+  const tip = document.getElementById('analyticsChartTooltip');
+  if (tip) tip.classList.remove('show');
+}
+
+function highlightDonutSlice(idx, name, qty, rev, pct, color) {
+  const titleEl = document.getElementById('donutCenterTitle');
+  const valEl = document.getElementById('donutCenterVal');
+  const subEl = document.getElementById('donutCenterSub');
+  if (titleEl) titleEl.textContent = name.slice(0, 7);
+  if (valEl) {
+    valEl.textContent = `${pct}%`;
+    valEl.setAttribute('fill', color || '#3B82F6');
+  }
+  if (subEl) subEl.textContent = `${qty}份 / $${rev}`;
+  document.querySelectorAll('.legend-interactive-row').forEach((row, i) => {
+    row.classList.toggle('active', i === idx);
+  });
+}
+
+function resetDonutSlice(defaultName, defaultPct, defaultSub, defaultColor) {
+  const titleEl = document.getElementById('donutCenterTitle');
+  const valEl = document.getElementById('donutCenterVal');
+  const subEl = document.getElementById('donutCenterSub');
+  if (titleEl) titleEl.textContent = defaultName.slice(0, 7);
+  if (valEl) {
+    valEl.textContent = `${defaultPct}%`;
+    valEl.setAttribute('fill', defaultColor || '#3B82F6');
+  }
+  if (subEl) subEl.textContent = defaultSub;
+  document.querySelectorAll('.legend-interactive-row').forEach(row => row.classList.remove('active'));
+}
+
+function filterAnalyticsOrdersByKey(type, key, label) {
+  if (state.analyticsSelectedFilter && state.analyticsSelectedFilter.type === type && state.analyticsSelectedFilter.key === key) {
+    state.analyticsSelectedFilter = null;
+  } else {
+    state.analyticsSelectedFilter = { type, key, label };
+  }
+  const store = state.stores.find(s => s.id === state.merchantStoreId) || state.stores[0];
+  if (store) renderMerchantAnalyticsPanel(store);
+}
+
+function parseOrderHour(order) {
+  const pt = String(order.pickupTime || '');
+  const m1 = pt.match(/(\d{1,2}):\d{2}/);
+  if (m1) return parseInt(m1[1], 10);
+  const ca = String(order.createdAt || '');
+  const m2 = ca.match(/(\d{1,2}):\d{2}/);
+  if (m2) return parseInt(m2[1], 10);
+  return 12;
 }
 
 function renderMerchantAnalyticsPanel(store) {
@@ -3357,57 +3475,99 @@ function renderMerchantAnalyticsPanel(store) {
   if (!panel) return;
 
   const period = state.analyticsPeriod || 'DAY';
-  const storeOrders = state.orders.filter(o => o.storeId === store.id && !String(o.status).includes('已取消'));
-  const liveRevenue = storeOrders.reduce((s, o) => s + (Number(o.finalTotal) || 0), 0);
-  const liveCount = storeOrders.length;
+  const todayStr = getTodayDateStr();
+  const tomorrowStr = getFutureDateStr(1);
 
-  // 依據「日 / 週 / 月」切換統計模型與真實訂單加成
-  let periodTitle = '今日時段營運分析 (10:00 - 19:00)';
-  let barLabels = ['10-11', '11-12', '12-13', '13-14', '14-16', '16-18', '18-19'];
-  let barValues = [3200, 8900, 14600, 9800, 4100, 7600, 5400];
-  let lineWaitMins = [4, 9, 16, 11, 5, 8, 6];
-  let totalRev = 53600 + liveRevenue;
-  let totalOrders = 412 + liveCount;
-  let divertedRev = 8450;
+  // 100% 讀取該店家的真實訂單資料 (排除已取消)
+  const allStoreOrders = state.orders.filter(o => o.storeId === store.id && !String(o.status).includes('已取消'));
 
-  if (period === 'WEEK') {
-    periodTitle = '本週各日營運分析 (週一至週日)';
-    barLabels = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
-    barValues = [52400, 56800, 61200, 58900, 64500, 29800, 24100];
-    lineWaitMins = [9, 11, 13, 12, 14, 6, 5];
-    totalRev = 347700 + liveRevenue;
-    totalOrders = 2690 + liveCount;
-    divertedRev = 54200;
-  } else if (period === 'MONTH') {
-    periodTitle = '本月各週營運趨勢分析 (W1 - W4)';
-    barLabels = ['第一週', '第二週', '第三週', '第四週'];
-    barValues = [328000, 356000, 372000, 389000];
-    lineWaitMins = [10, 11, 12, 9];
-    totalRev = 1445000 + liveRevenue;
-    totalOrders = 11240 + liveCount;
-    divertedRev = 218000;
+  // 依據「今日 / 本週 / 本月」篩選真實訂單並建立時間分組桶 (Buckets)
+  let periodTitle = `今日各時段真實營收與單量 (${todayStr})`;
+  let buckets = [];
+  let periodOrders = [];
+
+  if (period === 'DAY') {
+    periodOrders = allStoreOrders.filter(o => (o.pickupDate || todayStr) === todayStr);
+    // 若今日尚無訂單，自動包含該店所有真實訂單以供檢視
+    if (periodOrders.length === 0) periodOrders = allStoreOrders;
+    buckets = [
+      { key: '10', label: '10-11時', match: o => parseOrderHour(o) <= 10 },
+      { key: '11', label: '11-12時', match: o => parseOrderHour(o) === 11 },
+      { key: '12', label: '12-13時', match: o => parseOrderHour(o) === 12 },
+      { key: '13', label: '13-14時', match: o => parseOrderHour(o) === 13 },
+      { key: '14', label: '14-16時', match: o => parseOrderHour(o) >= 14 && parseOrderHour(o) <= 15 },
+      { key: '16', label: '16-18時', match: o => parseOrderHour(o) >= 16 && parseOrderHour(o) <= 17 },
+      { key: '18', label: '18時後', match: o => parseOrderHour(o) >= 18 }
+    ];
+  } else if (period === 'WEEK') {
+    periodTitle = '近 7 日每日真實營收與單量分析';
+    periodOrders = allStoreOrders;
+    const dayOffsets = [-3, -2, -1, 0, 1, 2, 3];
+    buckets = dayOffsets.map(off => {
+      const dStr = getDateOffsetFromStr(todayStr, off);
+      const shortLabel = off === 0 ? `今日(${dStr.slice(5)})` : off === 1 ? `明日(${dStr.slice(5)})` : dStr.slice(5);
+      return {
+        key: dStr,
+        label: shortLabel,
+        match: o => (o.pickupDate || todayStr) === dStr
+      };
+    });
+  } else {
+    periodTitle = '各取餐日期區間真實營收分析';
+    periodOrders = allStoreOrders;
+    const uniqueDates = [...new Set(allStoreOrders.map(o => o.pickupDate || todayStr))].sort();
+    buckets = (uniqueDates.length > 0 ? uniqueDates : [todayStr]).map(dStr => ({
+      key: dStr,
+      label: dStr.slice(5),
+      match: o => (o.pickupDate || todayStr) === dStr
+    }));
   }
 
-  const avgTicket = Math.round(totalRev / Math.max(1, totalOrders));
-  const maxBar = Math.max(...barValues, 1);
+  // 計算每個時段/日期桶的真實營收、真實單數、真實平均候餐分鐘數
+  const bucketStats = buckets.map(b => {
+    const matched = periodOrders.filter(b.match);
+    const rev = matched.reduce((s, o) => s + (Number(o.finalTotal) || 0), 0);
+    const count = matched.length;
+    const estWait = count === 0
+      ? 3
+      : Math.min(25, Math.max(4, Math.round((count / Math.max(1, store.maxCapacityPer15Min)) * 15) + 4));
+    return { ...b, orders: matched, rev, count, estWait };
+  });
 
-  // 1. 產生 SVG 柱狀圖 (Bar Chart)
+  // 真實 4 大 KPI 計算
+  const totalRev = periodOrders.reduce((s, o) => s + (Number(o.finalTotal) || 0), 0);
+  const totalOrders = periodOrders.length;
+  const avgTicket = totalOrders > 0 ? Math.round(totalRev / totalOrders) : 0;
+  const divertedOrders = periodOrders.filter(o => o.isDivertedOrder || (o.discount && Number(o.discount) > 0) || (o.promoApplied && o.promoApplied !== '一般點餐' && o.promoApplied !== '現場POS點餐'));
+  const divertedRev = divertedOrders.reduce((s, o) => s + (Number(o.finalTotal) || 0), 0);
+  const upcomingRes = allStoreOrders.filter(o => o.isReservation && (o.pickupDate || '') >= todayStr);
+
+  // 1. 產生互動式 SVG 柱狀圖 (Bar Chart)
+  const maxBar = Math.max(...bucketStats.map(b => b.rev), 100);
   const barSvgHtml = `
-    <svg viewBox="0 0 460 190" style="width:100%; height:185px; overflow:visible;">
-      ${barValues.map((v, i) => {
-        const colW = 380 / barValues.length;
-        const barW = Math.min(38, colW - 14);
-        const x = 45 + i * colW + (colW - barW) / 2;
-        const h = Math.max(8, Math.round((v / maxBar) * 130));
-        const y = 150 - h;
-        const labelVal = v >= 10000 ? `${(v / 1000).toFixed(1)}k` : v;
+    <svg viewBox="0 0 460 195" style="width:100%; height:190px; overflow:visible;" onmouseleave="hideAnalyticsTooltip()">
+      ${bucketStats.map((b, i) => {
+        const colW = 390 / bucketStats.length;
+        const barW = Math.min(42, colW - 12);
+        const x = 40 + i * colW + (colW - barW) / 2;
+        const h = b.rev > 0 ? Math.max(14, Math.round((b.rev / maxBar) * 128)) : 6;
+        const y = 152 - h;
+        const isSelected = state.analyticsSelectedFilter?.type === 'BUCKET' && state.analyticsSelectedFilter?.key === b.key;
         return `
-          <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="6" fill="url(#barGrad)" />
-          <text x="${x + barW / 2}" y="${y - 6}" text-anchor="middle" font-size="10" font-weight="800" fill="#1E293B">$${labelVal}</text>
-          <text x="${x + barW / 2}" y="168" text-anchor="middle" font-size="11" font-weight="700" fill="#64748B">${barLabels[i]}</text>
+          <g class="chart-interactive-bar"
+             onmousemove="showAnalyticsTooltip(event, '${escapeHtml(b.label)} 營運數據', '真實營收：NT$ ${b.rev.toLocaleString()} (${b.count} 筆訂單)', '點擊柱狀圖可於下方篩選檢視這 ${b.count} 筆真實訂單明細')"
+             ontouchstart="showAnalyticsTooltip(event, '${escapeHtml(b.label)} 營運數據', '真實營收：NT$ ${b.rev.toLocaleString()} (${b.count} 筆訂單)', '點擊下方篩選明細')"
+             onclick="filterAnalyticsOrdersByKey('BUCKET', '${escapeHtml(b.key)}', '時段/日期：${escapeHtml(b.label)}')">
+            <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="6"
+                  fill="${isSelected ? '#F97316' : (b.rev > 0 ? 'url(#barGrad)' : '#E2E8F0')}"
+                  stroke="${isSelected ? '#C2410C' : 'none'}" stroke-width="2" />
+            <text x="${x + barW / 2}" y="${y - 16}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#64748B">${b.count}單</text>
+            <text x="${x + barW / 2}" y="${y - 5}" text-anchor="middle" font-size="10.5" font-weight="900" fill="${isSelected ? '#C2410C' : '#0F172A'}">$${b.rev}</text>
+            <text x="${x + barW / 2}" y="170" text-anchor="middle" font-size="10.5" font-weight="800" fill="${isSelected ? '#EA580C' : '#475569'}">${escapeHtml(b.label)}</text>
+          </g>
         `;
       }).join('')}
-      <line x1="35" y1="150" x2="440" y2="150" stroke="#CBD5E1" stroke-width="1.5" />
+      <line x1="30" y1="152" x2="440" y2="152" stroke="#CBD5E1" stroke-width="1.5" />
       <defs>
         <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#3B82F6" />
@@ -3417,102 +3577,173 @@ function renderMerchantAnalyticsPanel(store) {
     </svg>
   `;
 
-  // 2. 產生 SVG 圓餅圖 (Donut Chart：熱銷品項營收佔比)
-  const menus = store.menus || [];
-  const pieItems = [
-    { name: menus[0]?.name || '招牌一號餐', pct: 38, color: '#3B82F6' },
-    { name: menus[1]?.name || '人氣二號餐', pct: 27, color: '#10B981' },
-    { name: menus[2]?.name || '主廚三號餐', pct: 21, color: '#F59E0B' },
-    { name: '其他單點與小菜', pct: 14, color: '#8B5CF6' }
-  ];
+  // 2. 產生 100% 真實訂單品項統計的互動式 SVG 圓餅圖 (Donut Chart)
+  const itemStatsMap = {};
+  let totalItemRevenue = 0;
+  periodOrders.forEach(o => {
+    let items = [];
+    try { items = JSON.parse(o.itemsJson || '[]'); } catch (e) {}
+    items.forEach(it => {
+      const baseName = String(it.name || '餐點').split(' [')[0].trim();
+      const qty = Number(it.qty) || 1;
+      const rev = (Number(it.price) || 0) * qty;
+      if (!itemStatsMap[baseName]) itemStatsMap[baseName] = { name: baseName, qty: 0, rev: 0 };
+      itemStatsMap[baseName].qty += qty;
+      itemStatsMap[baseName].rev += rev;
+      totalItemRevenue += rev;
+    });
+  });
+
+  const palette = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+  const sortedItems = Object.values(itemStatsMap).sort((a, b) => b.rev - a.rev);
+  let pieItems = [];
+  if (sortedItems.length === 0) {
+    pieItems = [{ name: '尚無餐點紀錄', qty: 0, rev: 0, pct: 100, color: '#CBD5E1' }];
+  } else {
+    const top4 = sortedItems.slice(0, 4);
+    const others = sortedItems.slice(4);
+    pieItems = top4.map((it, idx) => ({
+      name: it.name,
+      qty: it.qty,
+      rev: it.rev,
+      pct: Math.max(1, Math.round((it.rev / Math.max(1, totalItemRevenue)) * 100)),
+      color: palette[idx % palette.length]
+    }));
+    if (others.length > 0) {
+      const otherQty = others.reduce((s, i) => s + i.qty, 0);
+      const otherRev = others.reduce((s, i) => s + i.rev, 0);
+      pieItems.push({
+        name: '其他餐點合計',
+        qty: otherQty,
+        rev: otherRev,
+        pct: Math.max(1, Math.round((otherRev / Math.max(1, totalItemRevenue)) * 100)),
+        color: palette[4]
+      });
+    }
+    // 校正總和為 100%
+    const sumPct = pieItems.reduce((s, i) => s + i.pct, 0);
+    if (sumPct !== 100 && pieItems.length > 0) {
+      pieItems[0].pct = Math.max(1, pieItems[0].pct + (100 - sumPct));
+    }
+  }
+
+  const topPie = pieItems[0];
   let cumPct = 0;
-  const donutCircles = pieItems.map(seg => {
+  const donutCircles = pieItems.map((seg, idx) => {
     const dashArray = `${seg.pct} ${100 - seg.pct}`;
     const dashOffset = 25 - cumPct;
     cumPct += seg.pct;
-    return `<circle r="15.915" cx="21" cy="21" fill="transparent" stroke="${seg.color}" stroke-width="6.5" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashOffset}"></circle>`;
+    return `
+      <circle class="chart-interactive-slice"
+              r="15.915" cx="21" cy="21" fill="transparent"
+              stroke="${seg.color}" stroke-width="6.5"
+              stroke-dasharray="${dashArray}" stroke-dashoffset="${dashOffset}"
+              onmouseenter="highlightDonutSlice(${idx}, '${escapeHtml(seg.name)}', ${seg.qty}, ${seg.rev}, ${seg.pct}, '${seg.color}')"
+              onmousemove="showAnalyticsTooltip(event, '🍽️ ${escapeHtml(seg.name)}', '真實銷量：${seg.qty} 份 ・ 營收：NT$ ${seg.rev}', '佔比 ${seg.pct}%（點擊可篩選包含此餐點的真實訂單）')"
+              onmouseleave="resetDonutSlice('${escapeHtml(topPie.name)}', ${topPie.pct}, '${topPie.qty}份 / $${topPie.rev}', '${topPie.color}'); hideAnalyticsTooltip();"
+              onclick="filterAnalyticsOrdersByKey('ITEM', '${escapeHtml(seg.name)}', '餐點包含：${escapeHtml(seg.name)}')"></circle>
+    `;
   }).join('');
 
-  // 3. 產生 SVG 折線圖 (Line Chart：平均候餐時間與尖峰產能負載曲線)
-  const maxWait = 20;
-  const pts = lineWaitMins.map((w, i) => {
-    const x = 45 + (i * (370 / Math.max(1, lineWaitMins.length - 1)));
-    const y = 145 - Math.round((w / maxWait) * 115);
-    return { x, y, w, label: barLabels[i] };
+  // 3. 產生互動式 SVG 折線圖 (Line Chart：各時段真實單量與候餐負載曲線)
+  const maxWait = Math.max(20, ...bucketStats.map(b => b.estWait));
+  const pts = bucketStats.map((b, i) => {
+    const x = 45 + (i * (370 / Math.max(1, bucketStats.length - 1)));
+    const y = 145 - Math.round((b.estWait / maxWait) * 110);
+    return { x, y, w: b.estWait, count: b.count, rev: b.rev, label: b.label, key: b.key };
   });
   const polylinePoints = pts.map(p => `${p.x},${p.y}`).join(' ');
   const areaPoints = `45,145 ${polylinePoints} ${pts[pts.length - 1].x},145`;
 
-  // 4. 計算明日與預訂備料建議
-  const tomorrowStr = getFutureDateStr(1);
-  const upcomingRes = storeOrders.filter(o => o.isReservation && (o.pickupDate || '') >= getTodayDateStr());
+  // 4. 點擊圖表後的真實訂單明細鑽取列表 (Drill-down Order Table)
+  let drilldownOrders = periodOrders;
+  const activeFilter = state.analyticsSelectedFilter;
+  if (activeFilter) {
+    if (activeFilter.type === 'BUCKET') {
+      const targetBucket = bucketStats.find(b => b.key === activeFilter.key);
+      if (targetBucket) drilldownOrders = targetBucket.orders;
+    } else if (activeFilter.type === 'ITEM') {
+      drilldownOrders = periodOrders.filter(o => String(o.itemsJson || '').includes(activeFilter.key));
+    }
+  }
 
   panel.innerHTML = `
     <div class="analytics-panel-wrap">
-      <!-- 頂部：櫃位與 日/週/月 切換 -->
+      <!-- 頂部：櫃位與 日/週/月 切換 + 一鍵新增測試訂單驗證動態圖表 -->
       <div style="display:flex; justify-content:space-between; align-items:center; background:#FFFFFF; padding:12px 16px; border-radius:14px; border:1px solid var(--border); flex-wrap:wrap; gap:10px;">
         <div>
-          <h3 style="font-size:1.1rem; font-weight:950; color:var(--text-primary);">📊 ${escapeHtml(store.name)} — AI 營運與備料分析中心</h3>
-          <div style="font-size:0.78rem; color:var(--text-secondary);">即時整合 POS 收銀、線上掃碼、預訂訂單與佇列負載數據</div>
+          <h3 style="font-size:1.08rem; font-weight:950; color:var(--text-primary);">
+            📊 ${escapeHtml(store.name)} — 100% 真實訂單互動式營運分析
+          </h3>
+          <div style="font-size:0.78rem; color:var(--text-secondary);">
+            💡 <strong>滑鼠移過或手指觸碰任何柱狀、圓餅扇形、折線節點</strong>即可查看即時數據，<strong>點擊圖表元素</strong>可於下方篩選對應的真實訂單！
+          </div>
         </div>
-        <div style="display:flex; gap:6px;">
-          <button type="button" class="pos-cat-pill ${period === 'DAY' ? 'active' : ''}" onclick="setAnalyticsPeriod('DAY')">📅 今日 (日)</button>
-          <button type="button" class="pos-cat-pill ${period === 'WEEK' ? 'active' : ''}" onclick="setAnalyticsPeriod('WEEK')">📆 本週 (週)</button>
-          <button type="button" class="pos-cat-pill ${period === 'MONTH' ? 'active' : ''}" onclick="setAnalyticsPeriod('MONTH')">🗓️ 本月 (月)</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="pos-cat-pill ${period === 'DAY' ? 'active' : ''}" onclick="setAnalyticsPeriod('DAY')">📅 今日時段 (${allStoreOrders.filter(o => (o.pickupDate || todayStr) === todayStr).length}單)</button>
+          <button type="button" class="pos-cat-pill ${period === 'WEEK' ? 'active' : ''}" onclick="setAnalyticsPeriod('WEEK')">📆 近7日分日 (${allStoreOrders.length}單)</button>
+          <button type="button" class="pos-cat-pill ${period === 'MONTH' ? 'active' : ''}" onclick="setAnalyticsPeriod('MONTH')">🗓️ 全部日期總覽</button>
         </div>
       </div>
 
-      <!-- 4 大 KPI 指標卡 -->
+      <!-- 4 大 100% 真實計算 KPI 指標卡 -->
       <div class="analytics-kpi-grid">
         <div class="kpi-card">
-          <div class="kpi-title">💰 總營業額 (${period === 'DAY' ? '今日' : period === 'WEEK' ? '本週' : '本月'})</div>
+          <div class="kpi-title">💰 真實總營業額 (${periodOrders.length} 筆有效單)</div>
           <div class="kpi-val" style="color:var(--brand-dark);">NT$ ${totalRev.toLocaleString()}</div>
-          <div class="kpi-sub">較前期成長 +14.2%</div>
+          <div class="kpi-sub">100% 來自目前系統訂單即時加總</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-title">🧾 總完成單數 (含預訂 ${upcomingRes.length} 單)</div>
-          <div class="kpi-val">${totalOrders.toLocaleString()} 單</div>
-          <div class="kpi-sub">平均客單價 NT$ ${avgTicket}</div>
+          <div class="kpi-title">🧾 真實總單數 (含未來預訂 ${upcomingRes.length} 單)</div>
+          <div class="kpi-val">${totalOrders} 單</div>
+          <div class="kpi-sub">真實平均客單價 NT$ ${avgTicket}</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-title">🤖 AI 離峰引流挽回營收</div>
+          <div class="kpi-title">🤖 AI 離峰優惠引流營收 (${divertedOrders.length} 單)</div>
           <div class="kpi-val" style="color:#4F46E5;">NT$ ${divertedRev.toLocaleString()}</div>
-          <div class="kpi-sub" style="color:#4F46E5;">尖峰削峰率達 23.5%</div>
+          <div class="kpi-sub" style="color:#4F46E5;">佔總營收 ${totalRev > 0 ? Math.round((divertedRev / totalRev) * 100) : 0}%</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-title">⏱️ 平均出餐等候時間</div>
+          <div class="kpi-title">⏱️ 目前即時出餐等候 / 負載</div>
           <div class="kpi-val">${store.avgPrepMinutes} 分鐘</div>
-          <div class="kpi-sub">目前即時產能負載 ${store.loadPercentage}%</div>
+          <div class="kpi-sub">佇列 ${store.activeOrders}/${store.maxCapacityPer15Min} 單 (${store.loadPercentage}%)</div>
         </div>
       </div>
 
-      <!-- 圖表區：柱狀圖 (Bar Chart) + 圓餅圖 (Pie/Donut Chart) -->
+      <!-- 互動式圖表區：柱狀圖 (Bar Chart) + 圓餅圖 (Pie/Donut Chart) -->
       <div class="charts-grid">
         <div class="chart-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:900; font-size:0.95rem;">📊 ${escapeHtml(periodTitle)} — 營收柱狀圖 (Bar Chart)</span>
-            <span style="font-size:0.75rem; color:var(--brand); font-weight:800;">單位：新台幣 (NT$)</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:4px;">
+            <span style="font-weight:900; font-size:0.94rem;">📊 ${escapeHtml(periodTitle)} (可點擊柱狀篩選)</span>
+            <span style="font-size:0.74rem; color:var(--brand-dark); font-weight:800;">🖱️ 滑鼠移過查看詳情・點擊篩選訂單</span>
           </div>
           ${barSvgHtml}
         </div>
 
         <div class="chart-card">
-          <div style="font-weight:900; font-size:0.95rem; margin-bottom:10px;">🍩 熱銷餐點營收佔比 — 圓餅圖 (Pie Chart)</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-weight:900; font-size:0.94rem;">🍩 真實熱銷餐點營收佔比 (互動式圓餅圖)</span>
+            <span style="font-size:0.72rem; color:var(--text-secondary); font-weight:700;">總餐點營收 $${totalItemRevenue}</span>
+          </div>
           <div style="display:flex; align-items:center; justify-content:space-around; gap:12px; flex-wrap:wrap;">
-            <svg width="150" height="150" viewBox="0 0 42 42">
+            <svg width="155" height="155" viewBox="0 0 42 42" style="overflow:visible;">
               <circle r="15.915" cx="21" cy="21" fill="transparent" stroke="#F1F5F9" stroke-width="6.5"></circle>
               ${donutCircles}
-              <text x="21" y="20" text-anchor="middle" font-size="4.2" font-weight="900" fill="#0F172A">TOP 1</text>
-              <text x="21" y="25" text-anchor="middle" font-size="4.8" font-weight="900" fill="#3B82F6">38%</text>
+              <text id="donutCenterTitle" x="21" y="18.5" text-anchor="middle" font-size="3.3" font-weight="900" fill="#0F172A">${escapeHtml(topPie.name.slice(0, 7))}</text>
+              <text id="donutCenterVal" x="21" y="23.8" text-anchor="middle" font-size="4.6" font-weight="900" fill="${topPie.color}">${topPie.pct}%</text>
+              <text id="donutCenterSub" x="21" y="27.5" text-anchor="middle" font-size="2.6" font-weight="800" fill="#64748B">${topPie.qty}份 / $${topPie.rev}</text>
             </svg>
-            <div style="flex:1; min-width:160px; display:flex; flex-direction:column; gap:8px;">
-              ${pieItems.map(p => `
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.82rem;">
+            <div style="flex:1; min-width:170px; display:flex; flex-direction:column; gap:5px;">
+              ${pieItems.map((p, idx) => `
+                <div class="legend-interactive-row ${state.analyticsSelectedFilter?.type === 'ITEM' && state.analyticsSelectedFilter?.key === p.name ? 'active' : ''}"
+                     onmouseenter="highlightDonutSlice(${idx}, '${escapeHtml(p.name)}', ${p.qty}, ${p.rev}, ${p.pct}, '${p.color}')"
+                     onmouseleave="resetDonutSlice('${escapeHtml(topPie.name)}', ${topPie.pct}, '${topPie.qty}份 / $${topPie.rev}', '${topPie.color}')"
+                     onclick="filterAnalyticsOrdersByKey('ITEM', '${escapeHtml(p.name)}', '餐點包含：${escapeHtml(p.name)}')">
                   <div style="display:flex; align-items:center; gap:6px;">
                     <span style="width:10px; height:10px; border-radius:3px; background:${p.color}; display:inline-block;"></span>
-                    <span style="font-weight:800; color:var(--text-primary);">${escapeHtml(p.name)}</span>
+                    <span style="font-weight:800; font-size:0.8rem; color:var(--text-primary);">${escapeHtml(p.name)}</span>
                   </div>
-                  <span style="font-weight:900; color:var(--text-secondary);">${p.pct}%</span>
+                  <span style="font-weight:900; font-size:0.78rem; color:var(--text-secondary);">${p.qty}份 ($${p.rev} / ${p.pct}%)</span>
                 </div>
               `).join('')}
             </div>
@@ -3520,21 +3751,26 @@ function renderMerchantAnalyticsPanel(store) {
         </div>
       </div>
 
-      <!-- 折線圖 (Line Chart) + AI 智慧備餐與營運建議 -->
+      <!-- 互動式折線圖 (Line Chart) + AI 智慧備餐與營運建議 -->
       <div class="charts-grid">
         <div class="chart-card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-weight:900; font-size:0.95rem;">📈 尖離峰平均候餐時間趨勢 — 折線圖 (Line Chart)</span>
-            <span style="font-size:0.74rem; color:var(--red); font-weight:800;">紅線警戒：15分鐘</span>
+            <span style="font-weight:900; font-size:0.94rem;">📈 各時段單量與候餐時間折線圖 (可觸碰節點)</span>
+            <span style="font-size:0.74rem; color:var(--red); font-weight:800;">紅虛線：15分鐘警戒</span>
           </div>
-          <svg viewBox="0 0 460 175" style="width:100%; height:170px; overflow:visible;">
-            <line x1="35" y1="58" x2="435" y2="58" stroke="#FCA5A5" stroke-dasharray="4 4" stroke-width="1.5" />
+          <svg viewBox="0 0 460 175" style="width:100%; height:170px; overflow:visible;" onmouseleave="hideAnalyticsTooltip()">
+            <line x1="35" y1="62" x2="435" y2="62" stroke="#FCA5A5" stroke-dasharray="4 4" stroke-width="1.5" />
             <polygon points="${areaPoints}" fill="rgba(16, 185, 129, 0.14)" />
             <polyline fill="none" stroke="#10B981" stroke-width="3" points="${polylinePoints}" />
             ${pts.map(p => `
-              <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#FFFFFF" stroke="#059669" stroke-width="2.5" />
-              <text x="${p.x}" y="${p.y - 8}" text-anchor="middle" font-size="10" font-weight="900" fill="#065F46">${p.w}分</text>
-              <text x="${p.x}" y="164" text-anchor="middle" font-size="11" font-weight="700" fill="#64748B">${p.label}</text>
+              <g style="cursor:pointer;"
+                 onmousemove="showAnalyticsTooltip(event, '⏱️ ${escapeHtml(p.label)} 候餐負載', '平均候餐：約 ${p.w} 分鐘（共 ${p.count} 單 / $${p.rev}）', '點擊節點可篩選此時段訂單')"
+                 ontouchstart="showAnalyticsTooltip(event, '⏱️ ${escapeHtml(p.label)} 候餐負載', '平均候餐：約 ${p.w} 分鐘（共 ${p.count} 單 / $${p.rev}）', '點擊篩選此時段訂單')"
+                 onclick="filterAnalyticsOrdersByKey('BUCKET', '${escapeHtml(p.key)}', '時段/日期：${escapeHtml(p.label)}')">
+                <circle class="chart-interactive-point" cx="${p.x}" cy="${p.y}" r="5.5" fill="#FFFFFF" stroke="#059669" stroke-width="3" />
+                <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" font-size="10" font-weight="900" fill="#065F46">${p.w}分(${p.count}單)</text>
+                <text x="${p.x}" y="164" text-anchor="middle" font-size="10.5" font-weight="700" fill="#64748B">${escapeHtml(p.label)}</text>
+              </g>
             `).join('')}
             <line x1="35" y1="145" x2="435" y2="145" stroke="#CBD5E1" stroke-width="1.5" />
           </svg>
@@ -3542,22 +3778,58 @@ function renderMerchantAnalyticsPanel(store) {
 
         <div class="chart-card" style="background:linear-gradient(135deg, #EEF2FF 0%, #FFFFFF 100%); border-color:#C7D2FE;">
           <div style="font-weight:900; font-size:0.95rem; color:#312E81; margin-bottom:10px;">
-            🧠 AI 智慧備料預測與排班診斷報告
+            🧠 AI 根據本店真實訂單之備料與營運診斷
           </div>
           <div style="display:flex; flex-direction:column; gap:8px; font-size:0.82rem; color:#1E293B; line-height:1.5;">
             <div style="background:#FFFFFF; padding:8px 12px; border-radius:10px; border-left:4px solid #4F46E5;">
-              <strong>🥩 尖峰備餐量建議 (11:50 - 13:10)：</strong><br>
-              系統預測中午 12:10 達最高峰，建議於 <strong>11:40 提前預備「${escapeHtml(menus[0]?.name || '主力招牌餐')}」約 45 份半成品</strong>，可將候餐時間由 16 分壓低至 8 分鐘內。
+              <strong>🥇 本店真實人氣王備料建議：</strong><br>
+              目前真實銷量第一名為「<strong>${escapeHtml(topPie.name)}</strong>」（累計售出 <strong>${topPie.qty} 份 / NT$ ${topPie.rev}</strong>，佔全店營收 ${topPie.pct}%），建議於 11:30 前預先備妥至少 ${Math.max(15, topPie.qty * 3)} 份半成品以降低尖峰候餐時間。
             </div>
             <div style="background:#FFFFFF; padding:8px 12px; border-radius:10px; border-left:4px solid #10B981;">
-              <strong>📅 預訂訂單備料提醒：</strong><br>
-              目前系統內共有 <strong>${upcomingRes.length} 筆未來預訂單</strong>（明日 ${tomorrowStr} 佔 ${storeOrders.filter(o => o.pickupDate === tomorrowStr).length} 筆），請留意未繳費預訂單是否於取餐前兩日完成櫃檯收現。
+              <strong>📅 未來預訂訂單備料提醒：</strong><br>
+              目前系統內共有 <strong>${upcomingRes.length} 筆未來預訂單</strong>（明日 ${tomorrowStr} 佔 <strong>${allStoreOrders.filter(o => o.pickupDate === tomorrowStr).length} 筆</strong>），皆已連動計入上方真實營收分析。
             </div>
             <div style="background:#FFFFFF; padding:8px 12px; border-radius:10px; border-left:4px solid #F59E0B;">
-              <strong>🎁 AI 動態優惠調度建議：</strong><br>
-              下午 13:30–16:30 產能負載僅 28%，建議開啟「折抵 $10 或送小菜」離峰分流優惠，預估每日可多創造 18～25 筆離峰訂單。
+              <strong>🎁 AI 離峰優惠成效追蹤：</strong><br>
+              目前透過 AI 離峰優惠引流共創造 <strong>${divertedOrders.length} 筆訂單（NT$ ${divertedRev}）</strong>。當前佇列負載為 ${store.loadPercentage}%。
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 點擊圖表連動篩選的真實訂單明細表 -->
+      <div class="chart-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <div>
+            <span style="font-weight:900; font-size:0.95rem;">
+              🔍 圖表真實數據來源明細 (${activeFilter ? `已篩選：【${escapeHtml(activeFilter.label)}】共 ${drilldownOrders.length} 筆` : `全部共 ${drilldownOrders.length} 筆真實訂單`})
+            </span>
+          </div>
+          ${activeFilter ? `
+            <button type="button" class="pos-cat-pill active" onclick="filterAnalyticsOrdersByKey('${escapeHtml(activeFilter.type)}', '${escapeHtml(activeFilter.key)}', '')">
+              ✖ 清除圖表篩選（顯示全部 ${periodOrders.length} 筆）
+            </button>
+          ` : `<span style="font-size:0.76rem; color:var(--text-secondary);">💡 點擊上方任一柱狀圖或圓餅圖扇形即可過濾此明細表</span>`}
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:8px; max-height:240px; overflow-y:auto;">
+          ${drilldownOrders.map(o => {
+            let items = [];
+            try { items = JSON.parse(o.itemsJson || '[]'); } catch (e) {}
+            const summary = items.map(i => `${i.name}×${i.qty || 1}`).join('、');
+            return `
+              <div style="padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:#F8FAFC; font-size:0.78rem; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div style="min-width:0; flex:1;">
+                  <div style="font-weight:900; color:var(--text-primary);">
+                    #${escapeHtml(o.pickupNumber)} ・ ${escapeHtml(o.pickupDate || todayStr)} ${escapeHtml(o.pickupTime || '')}
+                    <span style="font-size:0.7rem; color:var(--brand-dark);">(${escapeHtml(o.status)})</span>
+                  </div>
+                  <div style="color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(summary)}</div>
+                </div>
+                <div style="font-weight:950; color:var(--red); white-space:nowrap;">NT$ ${o.finalTotal}</div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     </div>
@@ -3705,34 +3977,35 @@ function renderMerchantSettingsPanel(store) {
       ` : ''}
 
       ${sub === 'line' ? `
-        <!-- 子頁籤 3：LINE Login OAuth 2.1 + Flex Message 推播設定 (店家可選是否綁定自己的官方 LINE，不綁定則自動使用系統主預設官方 LINE) -->
+        <!-- 子頁籤 3：LINE Login OAuth 2.1 + Flex Message 推播設定 + Email 無限額雙軌通知 -->
         <div class="chart-card" style="border:1.5px solid #86EFAC; background:#F0FDF4;">
           <h3 style="font-size:1.05rem; font-weight:900; color:#065F46; margin-bottom:6px;">
-            💚 LINE 官方帳號推播設定（${escapeHtml(store.name)}）
+            💚 LINE 官方帳號 + 📧 Email 無限額雙軌推播設定（${escapeHtml(store.name)}）
           </h3>
           <p style="font-size:0.82rem; color:#047857; line-height:1.5; margin-bottom:14px;">
-            採用 <strong>LINE Login OAuth 2.1 授權綁定 + Messaging API Flex Message 卡片推播（免設定 Webhook）</strong>。<br>
-            各店家可自由選擇是否綁定自己的官方 LINE；<strong>若店家選擇不綁定，系統將自動使用平台預設的總官方 LINE 帳號進行綁定與推播！</strong>
+            ⚠️ <strong>為什麼以各店家獨立官方 LINE 為主？</strong>因為 LINE 官方帳號免費輕用量方案每月僅有 <strong>200 則免費推播額度</strong>，單一帳號一天就會爆量！<br>
+            ・<strong>🏆 黑客鬆比賽 Demo 期間</strong>：預設使用您的平台總官方 LINE（Channel ID: <code>2012260287</code>）直接展示推播。<br>
+            ・<strong>🏪 正式營運期間</strong>：請各店家切換至「綁定本店專屬官方 LINE」填入自己的 Channel 憑證，並搭配 <strong>📧 Email 免額度自動寄信通知 (Google Apps Script MailApp)</strong>，徹底解決訊息限額問題！
           </p>
 
-          <!-- 選擇模式：使用系統預設官方 LINE vs 綁定本店專屬官方 LINE -->
+          <!-- 選擇模式：使用比賽預設官方 LINE vs 綁定店家專屬官方 LINE (正式營運主力) -->
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
-            <label class="option-label-row ${!store.useCustomLineOa ? 'checked' : ''}" style="background:#FFFFFF; margin-bottom:0;" onclick="toggleStoreCustomLineMode(false)">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <input type="radio" name="storeLineOaMode" ${!store.useCustomLineOa ? 'checked' : ''} style="width:18px; height:18px; accent-color:#06C755;">
-                <div>
-                  <div style="font-weight:900; color:var(--text-primary);">🌐 使用系統預設官方 LINE (預設推薦)</div>
-                  <div style="font-size:0.74rem; color:var(--text-secondary);">店家免申請，直接使用平台主的官方 LINE 推播</div>
-                </div>
-              </div>
-            </label>
-
             <label class="option-label-row ${store.useCustomLineOa ? 'checked' : ''}" style="background:#FFFFFF; margin-bottom:0;" onclick="toggleStoreCustomLineMode(true)">
               <div style="display:flex; align-items:center; gap:10px;">
                 <input type="radio" name="storeLineOaMode" ${store.useCustomLineOa ? 'checked' : ''} style="width:18px; height:18px; accent-color:#06C755;">
                 <div>
-                  <div style="font-weight:900; color:var(--text-primary);">🏪 綁定「${escapeHtml(store.name)}」專屬官方 LINE</div>
-                  <div style="font-size:0.74rem; color:var(--text-secondary);">使用此店家獨立的 LINE Login 與 Messaging API</div>
+                  <div style="font-weight:900; color:var(--text-primary);">🏪 正式營運主力：綁定「${escapeHtml(store.name)}」專屬官方 LINE</div>
+                  <div style="font-size:0.74rem; color:var(--text-secondary);">各店獨立計算每月免費推播額度，避免單一帳號 200 則耗盡</div>
+                </div>
+              </div>
+            </label>
+
+            <label class="option-label-row ${!store.useCustomLineOa ? 'checked' : ''}" style="background:#FFFFFF; margin-bottom:0;" onclick="toggleStoreCustomLineMode(false)">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <input type="radio" name="storeLineOaMode" ${!store.useCustomLineOa ? 'checked' : ''} style="width:18px; height:18px; accent-color:#06C755;">
+                <div>
+                  <div style="font-weight:900; color:var(--text-primary);">🏆 黑客鬆比賽 Demo：使用平台預設官方 LINE (2012260287)</div>
+                  <div style="font-size:0.74rem; color:var(--text-secondary);">比賽期間免設定即可推播，並自動啟用 Email 零限額備援通知</div>
                 </div>
               </div>
             </label>
@@ -3741,16 +4014,16 @@ function renderMerchantSettingsPanel(store) {
           ${store.useCustomLineOa ? `
             <div style="background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #86EFAC; margin-bottom:12px;">
               <div style="font-size:0.86rem; font-weight:900; color:#065F46; margin-bottom:10px;">
-                🏪 「${escapeHtml(store.name)}」專屬官方 LINE 參數設定
+                🏪 「${escapeHtml(store.name)}」專屬官方 LINE 參數設定（正式營運必填）
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
                 <div>
                   <label class="field-label">LINE Login Channel ID (Client ID)</label>
-                  <input type="text" id="cfgStoreLineClientId" class="select-input" placeholder="例如：2009184950" value="${escapeHtml(store.customLineClientId || '')}">
+                  <input type="text" id="cfgStoreLineClientId" class="select-input" placeholder="例如：2012260287" value="${escapeHtml(store.customLineClientId || '')}">
                 </div>
                 <div>
                   <label class="field-label">LINE Login Channel Secret</label>
-                  <input type="password" id="cfgStoreLineClientSecret" class="select-input" placeholder="輸入 LINE Login Channel Secret" value="${escapeHtml(store.customLineClientSecret || '')}">
+                  <input type="password" id="cfgStoreLineClientSecret" class="select-input" placeholder="輸入店家 LINE Login Channel Secret" value="${escapeHtml(store.customLineClientSecret || '')}">
                 </div>
               </div>
               <div>
@@ -3761,30 +4034,30 @@ function renderMerchantSettingsPanel(store) {
           ` : `
             <div style="background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #A7F3D0; margin-bottom:12px;">
               <div style="font-size:0.86rem; font-weight:900; color:#065F46; margin-bottom:6px;">
-                ✅ 目前「${escapeHtml(store.name)}」已啟用【系統主預設官方 LINE】代管推播
+                🏆 目前「${escapeHtml(store.name)}」使用【黑客鬆比賽預設官方 LINE (2012260287) + 📧 Email 無限額通知】
               </div>
               <p style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:10px;">
-                當顧客於本店點餐、餐點完成叫號或預訂逾期時，將自動由系統總官方帳號發送精美 Flex Message 通知卡片。下方可更新系統主預設官方 LINE 參數：
+                系統已內建您的新憑證（Channel ID: <code>2012260287</code>）。若 LINE 免費 200 則額度滿載，或學生有填寫 Email，後端 GAS 會同步透過 <code>MailApp.sendEmail</code> 發送 HTML 取餐通知信（完全無每月則數限制）：
               </p>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
                 <div>
-                  <label class="field-label">系統預設 LINE Login Channel ID</label>
-                  <input type="text" id="cfgSysLineClientId" class="select-input" placeholder="預設：2011878497" value="${escapeHtml(state.lineProfile.customClientId || DEFAULT_LINE_CLIENT_ID)}">
+                  <label class="field-label">比賽預設 LINE Login Channel ID</label>
+                  <input type="text" id="cfgSysLineClientId" class="select-input" placeholder="預設：2012260287" value="${escapeHtml(state.lineProfile.customClientId || DEFAULT_LINE_CLIENT_ID)}">
                 </div>
                 <div>
-                  <label class="field-label">系統預設 LINE Login Channel Secret (選填)</label>
-                  <input type="password" id="cfgSysLineClientSecret" class="select-input" placeholder="留空則使用 GAS 內建預設值">
+                  <label class="field-label">比賽預設 LINE Login Channel Secret</label>
+                  <input type="password" id="cfgSysLineClientSecret" class="select-input" placeholder="已內建 e78839eba4d3aa7d4ec65633924de226">
                 </div>
               </div>
               <div>
-                <label class="field-label">系統預設 Messaging API Channel Access Token (選填)</label>
-                <input type="password" id="cfgLineAccessToken" class="select-input" placeholder="留空則使用 GAS 內建預設 Token">
+                <label class="field-label">比賽預設 Messaging API Channel Access Token</label>
+                <input type="password" id="cfgLineAccessToken" class="select-input" placeholder="已內建 rPsZmKQjS70tezeGNsf5+lo1QZvRSCnd...">
               </div>
             </div>
           `}
 
           <button type="button" class="btn-line" style="padding:11px 18px; font-size:0.88rem;" onclick="saveLineMessagingConfig()">
-            💾 儲存 LINE 官方帳號推播設定
+            💾 儲存 LINE 官方帳號與 Email 雙軌推播設定
           </button>
         </div>
 

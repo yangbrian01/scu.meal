@@ -10,12 +10,13 @@
 const SHEET_ID = '14SaczmfdgXx9t4WfoSBrD_8gs7wzdCcNrsroT0bvzok';
 const DB_SCHEMA_VERSION = 'MEALFLOW_SCHEMA_V8_0';
 
-// ==================== 系統預設（平台方/您的）官方 LINE 帳號設定 ====================
-// 若店家選擇「不綁定店家自己的官方 LINE」，系統將自動使用下方您的預設官方 LINE 進行 OAuth 綁定與 Flex 卡片推播！
+// ==================== 系統預設（黑客鬆比賽 Demo 共用）官方 LINE 帳號設定 ====================
+// 正式營運時各店家以綁定「店家自有官方 LINE」為主（避免單一帳號每月 200 則免費推播額度耗盡）；
+// 比賽 Demo 期間或店家尚未設定時，自動 fallback 使用下方您的官方 LINE 帳號 + 無限額 Email 雙軌推播！
 const scriptProps = PropertiesService.getScriptProperties();
-const SYSTEM_LINE_CLIENT_ID = scriptProps.getProperty('LINE_CLIENT_ID') || '2011878497';
-const SYSTEM_LINE_CLIENT_SECRET = scriptProps.getProperty('LINE_CLIENT_SECRET') || '3d7c605dbb48b8dea47b7ea167c1ec87';
-const SYSTEM_LINE_CHANNEL_TOKEN = scriptProps.getProperty('LINE_CHANNEL_TOKEN') || 'Uxdm520DRvL5r2uuqp5dRwfnBVSzC5PAxoJf/6lGHKfb6vGwGCtYEKUkQDORLyqLujrfPc8Sk9WQBWa/PdIxQS5Bb0lFzi/mNOTsotq2qm8nZKtYheSq+mVStxLoU8lC2DfELj/G3ZM2HKIts6nGOAdB04t89/1O/w1cDnyilFU=';
+const SYSTEM_LINE_CLIENT_ID = scriptProps.getProperty('LINE_CLIENT_ID') || '2012260287';
+const SYSTEM_LINE_CLIENT_SECRET = scriptProps.getProperty('LINE_CLIENT_SECRET') || 'e78839eba4d3aa7d4ec65633924de226';
+const SYSTEM_LINE_CHANNEL_TOKEN = scriptProps.getProperty('LINE_CHANNEL_TOKEN') || 'rPsZmKQjS70tezeGNsf5+lo1QZvRSCndTCG+iCDHsTGCOSqomxt5uVv3AOM4qRq384mKSkWeK+OatPl3p+NRBnuSB8I5wAn8dRR5GAUatNxM44Gc2POkD6pTHtAFlmahEeYbstNW0s06t4S1NkAsZAdB04t89/1O/w1cDnyilFU=';
 
 function doGet(e) {
   const params = (e && e.parameter) ? e.parameter : {};
@@ -339,6 +340,7 @@ function handleLineCallback(ss, params) {
 
     return {
       success: true,
+      status: 'success',
       lineUid: userUID,
       displayName: displayName,
       pictureUrl: pictureUrl
@@ -505,21 +507,81 @@ function saveLineDevConfig(ss, params) {
 }
 
 function handleManualLinePush(ss, params) {
-  const sent = sendLinePushMessage(
-    ss,
-    params.lineUserId,
-    params.message,
-    params.channelAccessToken || '',
-    {
-      storeId: params.storeId || '',
-      title: params.title || '東吳學餐 MealFlow 通知',
-      pickupNumber: params.pickupNumber || '',
-      storeName: params.storeName || '東吳學餐',
-      statusText: params.statusText || '即時通知',
-      orderUrl: params.orderUrl || 'https://yangbrian01.github.io/scu.meal/order/'
-    }
-  );
-  return { sent };
+  const flexMeta = {
+    storeId: params.storeId || '',
+    title: params.title || '東吳學餐 MealFlow 通知',
+    pickupNumber: params.pickupNumber || '',
+    storeName: params.storeName || '東吳學餐',
+    statusText: params.statusText || '即時通知',
+    orderUrl: params.orderUrl || 'https://yangbrian01.github.io/scu.meal/order/'
+  };
+
+  let lineSent = false;
+  if (params.lineUserId && String(params.lineUserId).startsWith('U')) {
+    lineSent = sendLinePushMessage(
+      ss,
+      params.lineUserId,
+      params.message,
+      params.channelAccessToken || '',
+      flexMeta
+    );
+  }
+
+  let emailSent = false;
+  if (params.email && String(params.email).indexOf('@') > 0) {
+    emailSent = sendOrderEmailNotification(params.email, params.message, flexMeta);
+  }
+
+  return { sent: lineSent || emailSent, lineSent: lineSent, emailSent: emailSent };
+}
+
+/**
+ * 📧 免費無限額 Email 訂單與取餐推播 (MailApp.sendEmail)
+ * 解決 LINE 官方帳號免費版每月 200 則限制，支援雙軌或純 Email 即時取餐通知！
+ */
+function sendOrderEmailNotification(email, messageText, meta) {
+  try {
+    const cleanEmail = String(email || '').trim();
+    if (!cleanEmail || cleanEmail.indexOf('@') < 1) return false;
+    const m = meta || {};
+    const title = m.title || '東吳學餐 MealFlow 訂單通知';
+    const pickupNumber = m.pickupNumber ? ('#' + m.pickupNumber) : '';
+    const storeName = m.storeName || '東吳學餐';
+    const orderUrl = m.orderUrl || 'https://yangbrian01.github.io/scu.meal/order/';
+
+    const htmlBody = `
+      <div style="font-family:'Noto Sans TC',sans-serif; max-width:480px; margin:0 auto; border:1px solid #E5E7EB; border-radius:16px; overflow:hidden; background:#FFFFFF;">
+        <div style="background:linear-gradient(135deg,#FF5A1F,#E04812); color:#FFFFFF; padding:18px 20px;">
+          <div style="font-size:12px; font-weight:bold; opacity:0.9;">東吳學餐 MealFlow 智慧點餐通知</div>
+          <h2 style="margin:6px 0 0; font-size:20px;">${title}</h2>
+        </div>
+        <div style="padding:20px;">
+          ${pickupNumber ? `
+            <div style="background:#FFF7ED; border:1.5px solid #FDBA74; border-radius:12px; padding:12px; text-align:center; margin-bottom:14px;">
+              <div style="font-size:12px; color:#9A3412; font-weight:bold;">您的取餐號碼 (${storeName})</div>
+              <div style="font-size:36px; font-weight:900; color:#EA580C;">${pickupNumber}</div>
+            </div>
+          ` : ''}
+          <p style="font-size:15px; color:#1F2937; line-height:1.6;">${String(messageText || '')}</p>
+          <div style="margin-top:20px; text-align:center;">
+            <a href="${orderUrl}" style="display:inline-block; background:#FF5A1F; color:#FFFFFF; text-decoration:none; font-weight:bold; padding:12px 24px; border-radius:999px; font-size:14px;">
+              🎟️ 點此開啟電子取餐單
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    MailApp.sendEmail({
+      to: cleanEmail,
+      subject: `【東吳學餐 MealFlow】${title} ${pickupNumber}`,
+      body: `${title}\n${messageText}\n查看取餐單：${orderUrl}`,
+      htmlBody: htmlBody
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
