@@ -1,14 +1,14 @@
 /**
- * MealFlow 學餐 AI 流量管制塔 - 企業級後端引擎 v6.0 (Google Apps Script)
+ * MealFlow 學餐 AI 流量管制塔 - 企業級後端引擎 v7.0 (Google Apps Script)
  * 支援：
- * 1. M/M/1 佇列動態等待時間與多目標效用評分 (Multi-Objective Utility Scoring)
- * 2. 掃碼點餐專屬訂單亂碼憑證 (Order Token) 與預訂規則 (今日/1-2天禁現金/3天以上前兩天櫃檯繳現、逾期自動刪單)
- * 3. 店家真實菜單 CRUD (`saveStoreMenus`) 與 Gemini Vision AI 菜單辨識 (`aiParseMenu`)
- * 4. 取餐重複呼叫通知 (`notifyCount`) 與 LINE 官方帳號 / LINE Notify 推播整合
+ * 1. LINE Developers Messaging API 真實串接 (Webhook 自動綁定 userId + Push API 即時推播通知)
+ * 2. 店家自訂「一次性免洗餐具收費金額 (cutleryPrice)」與真實菜單 CRUD / AI 掃描匯入
+ * 3. 預訂取餐規則 (今日可現金 / 1-2天禁現金 / 3天以上前兩天櫃檯繳現，逾期自動刪單)
+ * 4. 意圖感知型 AI 選餐顧問與營運數據分析
  */
 
 const SHEET_ID = '14SaczmfdgXx9t4WfoSBrD_8gs7wzdCcNrsroT0bvzok';
-const DB_SCHEMA_VERSION = 'MEALFLOW_SCHEMA_V6_0';
+const DB_SCHEMA_VERSION = 'MEALFLOW_SCHEMA_V7_0';
 
 function doGet(e) {
   const params = (e && e.parameter) ? e.parameter : {};
@@ -22,7 +22,7 @@ function doGet(e) {
 
   return jsonResponse({
     success: true,
-    service: 'MealFlow AI Engine v6.0 (POS + Reservation Rules + LINE Notify + Menu OCR)',
+    service: 'MealFlow AI Engine v7.0 (LINE Developers Messaging API + Tablet POS + AI Analytics)',
     status: 'ONLINE'
   });
 }
@@ -40,13 +40,20 @@ function doPost(e) {
   try {
     const rawBody = (e && e.postData && e.postData.contents) ? e.postData.contents : '{}';
     const params = JSON.parse(rawBody);
-    const action = params.action;
     const ss = SpreadsheetApp.openById(SHEET_ID);
 
     ensureDatabaseInitialized(ss, Boolean(params.forceInit));
+
+    // ==================== 1. 攔截並處理 LINE Developers Messaging API Webhook 事件 ====================
+    if (params.events && Array.isArray(params.events)) {
+      handleLineWebhookEvents(ss, params.events);
+      return jsonResponse({ success: true, webhook: 'LINE_OK' });
+    }
+
     // 每次請求時自動巡檢並刪除逾期未繳費之遠期預訂單
     purgeExpiredReservations(ss);
 
+    const action = params.action;
     let result = {};
     switch (action) {
       case 'initBundle':
@@ -82,6 +89,15 @@ function doPost(e) {
       case 'askAiConcierge':
         result = handleAiConcierge(ss, params);
         break;
+      case 'saveLineDevConfig':
+        result = saveLineDevConfig(ss, params);
+        break;
+      case 'checkLineBindStatus':
+        result = checkLineBindStatus(ss, params);
+        break;
+      case 'sendLinePush':
+        result = handleManualLinePush(ss, params);
+        break;
       default:
         throw new Error('未知的 API Action: ' + action);
     }
@@ -107,7 +123,7 @@ function jsonResponse(payload) {
 }
 
 /**
- * 自動初始化資料庫結構（含快取檢查）
+ * 自動初始化資料庫結構（含 LineBindings 綁定表與 cutleryPrice）
  */
 function ensureDatabaseInitialized(ss, forceCheck) {
   const props = PropertiesService.getScriptProperties();
@@ -121,18 +137,20 @@ function ensureDatabaseInitialized(ss, forceCheck) {
     storeSheet.appendRow([
       'id', 'campus', 'name', 'category', 'maxCapacityPer15Min',
       'activeOrders', 'avgPrepMinutes', 'isAutoThrottle',
-      'promoMode', 'promoText', 'promoDiscount', 'predictedDailyOrders', 'rating'
+      'promoMode', 'promoText', 'promoDiscount', 'predictedDailyOrders', 'rating', 'cutleryPrice'
     ]);
     const defaultStores = [
-      ['S01', '雙溪校區', '趙班長海苔飯捲', '人氣韓式・飯捲', 18, 17, 22, true, 'none', '無優惠', 0, 240, 4.9],
-      ['S02', '雙溪校區', '雙溪-丼物園', '日式蓋飯・烏龍麵', 20, 4, 5, true, 'gift', '🎁 AI分流招待：免費溫泉蛋乙顆', 0, 165, 4.7],
-      ['S03', '雙溪校區', '雙溪-四海遊龍', '鍋貼水餃・麵食', 25, 19, 16, true, 'none', '無優惠', 0, 210, 4.6],
-      ['S04', '雙溪校區', '蒲家廚房', '中式特餐・便當', 20, 5, 6, true, 'discount', '💰 AI分流折抵：現折 $10 元', 10, 150, 4.8],
-      ['S05', '城中校區', '城中-咖哩食堂', '熟成咖哩・炸物', 15, 16, 26, true, 'none', '無優惠', 0, 195, 4.8],
-      ['S06', '城中校區', '城中-吳葉食堂', '精緻台式簡餐', 20, 3, 4, true, 'gift', '🎁 AI分流招待：免費招牌冰紅茶', 0, 145, 4.9],
-      ['S07', '城中校區', '大熊涼麵 X 吃好食堂', '手工涼麵・味噌湯', 25, 6, 3, true, 'points', '⚡ AI分流回饋：雙倍 MealPoints 點數', 0, 160, 4.7]
+      ['S01', '雙溪校區', '趙班長海苔飯捲', '人氣韓式・飯捲', 18, 17, 22, true, 'none', '無優惠', 0, 240, 4.9, 1],
+      ['S02', '雙溪校區', '雙溪-丼物園', '日式蓋飯・烏龍麵', 20, 4, 5, true, 'gift', '🎁 AI分流招待：免費溫泉蛋乙顆', 0, 165, 4.7, 1],
+      ['S03', '雙溪校區', '雙溪-四海遊龍', '鍋貼水餃・麵食', 25, 19, 16, true, 'none', '無優惠', 0, 210, 4.6, 1],
+      ['S04', '雙溪校區', '蒲家廚房', '中式特餐・便當', 20, 5, 6, true, 'discount', '💰 AI分流折抵：現折 $10 元', 10, 150, 4.8, 1],
+      ['S05', '城中校區', '城中-咖哩食堂', '熟成咖哩・炸物', 15, 16, 26, true, 'none', '無優惠', 0, 195, 4.8, 1],
+      ['S06', '城中校區', '城中-吳葉食堂', '精緻台式簡餐', 20, 3, 4, true, 'gift', '🎁 AI分流招待：免費招牌冰紅茶', 0, 145, 4.9, 1],
+      ['S07', '城中校區', '大熊涼麵 X 吃好食堂', '手工涼麵・味噌湯', 25, 6, 3, true, 'points', '⚡ AI分流回饋：雙倍 MealPoints 點數', 0, 160, 4.7, 1]
     ];
     defaultStores.forEach(r => storeSheet.appendRow(r));
+  } else if (storeSheet.getLastColumn() < 14) {
+    storeSheet.getRange(1, 14).setValue('cutleryPrice');
   }
 
   let menuSheet = ss.getSheetByName('Menus');
@@ -192,7 +210,152 @@ function ensureDatabaseInitialized(ss, forceCheck) {
     ]);
   }
 
+  let bindSheet = ss.getSheetByName('LineBindings');
+  if (!bindSheet) {
+    bindSheet = ss.insertSheet('LineBindings');
+    bindSheet.appendRow(['bindCode', 'lineUserId', 'displayName', 'updatedAt']);
+  }
+
   props.setProperty('DB_INIT_VER', DB_SCHEMA_VERSION);
+}
+
+// ==================== LINE Developers Messaging API 真實串接模組 ====================
+/**
+ * 處理 LINE 官方帳號 Webhook 傳入的事件：
+ * 當學生在 LINE 聊天室輸入「綁定 1234」或直接輸入 4~6 碼綁定碼時，自動取得其真實 lineUserId (Uxxxx...) 並寫入 LineBindings 表！
+ */
+function handleLineWebhookEvents(ss, events) {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || '';
+  const bindSheet = ss.getSheetByName('LineBindings');
+
+  events.forEach(ev => {
+    if (!ev || !ev.source || !ev.source.userId) return;
+    const userId = ev.source.userId;
+    const replyToken = ev.replyToken;
+
+    if (ev.type === 'follow') {
+      if (token && replyToken) {
+        replyLineMessage(token, replyToken, '🎉 歡迎加入「東吳學餐 MealFlow」官方通知！\n請在點餐網頁點擊「綁定 LINE 通知」，並將網頁上的 4 位數綁定碼傳送到這裡，即可完成自動綁定！');
+      }
+      return;
+    }
+
+    if (ev.type === 'message' && ev.message && ev.message.type === 'text') {
+      const text = String(ev.message.text || '').trim();
+      const codeMatch = text.match(/(?:綁定\s*)?([A-Za-z0-9]{4,8})/);
+      if (codeMatch) {
+        const bindCode = codeMatch[1].toUpperCase();
+        let displayName = 'LINE用戶';
+        if (token) {
+          try {
+            const profRes = UrlFetchApp.fetch('https://api.line.me/v2/bot/profile/' + encodeURIComponent(userId), {
+              method: 'get',
+              headers: { 'Authorization': 'Bearer ' + token },
+              muteHttpExceptions: true
+            });
+            const prof = JSON.parse(profRes.getContentText());
+            if (prof && prof.displayName) displayName = prof.displayName;
+          } catch (e) {}
+        }
+
+        const nowStr = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
+        bindSheet.appendRow([bindCode, userId, displayName, nowStr]);
+
+        if (token && replyToken) {
+          replyLineMessage(
+            token,
+            replyToken,
+            `✅ 綁定成功！\n嗨 ${displayName}，您的驗證碼【${bindCode}】已成功連結至東吳學餐 MealFlow。\n\n往後您的：\n1. 🟢 訂單成立憑證\n2. 🔔 餐點製作完成取餐呼叫\n3. ⏳ 預訂繳費期限提醒\n4. ❌ 訂單取消或完成通知\n都會即時傳送到此 LINE 對話視窗！`
+          );
+        }
+      }
+    }
+  });
+}
+
+function replyLineMessage(token, replyToken, text) {
+  try {
+    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + token },
+      payload: JSON.stringify({
+        replyToken: replyToken,
+        messages: [{ type: 'text', text: text }]
+      }),
+      muteHttpExceptions: true
+    });
+  } catch (e) {}
+}
+
+/**
+ * 透過 LINE Messaging API Push Message 主動推播訊息給指定 lineUserId
+ */
+function sendLinePushMessage(ss, lineUserId, text, tokenOverride) {
+  if (!lineUserId || !String(lineUserId).startsWith('U')) return false;
+  const props = PropertiesService.getScriptProperties();
+  const token = tokenOverride || props.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || '';
+  if (!token) return false;
+
+  try {
+    const res = UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Bearer ' + token },
+      payload: JSON.stringify({
+        to: String(lineUserId).trim(),
+        messages: [{ type: 'text', text: text }]
+      }),
+      muteHttpExceptions: true
+    });
+    return res.getResponseCode() >= 200 && res.getResponseCode() < 300;
+  } catch (e) {
+    return false;
+  }
+}
+
+function saveLineDevConfig(ss, params) {
+  const props = PropertiesService.getScriptProperties();
+  if (params.channelAccessToken !== undefined) {
+    props.setProperty('LINE_CHANNEL_ACCESS_TOKEN', String(params.channelAccessToken).trim());
+  }
+  if (params.botBasicId !== undefined) {
+    props.setProperty('LINE_BOT_BASIC_ID', String(params.botBasicId).trim());
+  }
+  if (params.liffId !== undefined) {
+    props.setProperty('LINE_LIFF_ID', String(params.liffId).trim());
+  }
+  return {
+    saved: true,
+    botBasicId: props.getProperty('LINE_BOT_BASIC_ID') || '',
+    liffId: props.getProperty('LINE_LIFF_ID') || '',
+    hasToken: Boolean(props.getProperty('LINE_CHANNEL_ACCESS_TOKEN'))
+  };
+}
+
+function checkLineBindStatus(ss, params) {
+  const code = String(params.bindCode || '').trim().toUpperCase();
+  if (!code) return { bound: false };
+  const bindSheet = ss.getSheetByName('LineBindings');
+  if (!bindSheet) return { bound: false };
+  const rows = bindSheet.getDataRange().getValues();
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]).toUpperCase() === code) {
+      return {
+        bound: true,
+        bindCode: code,
+        lineUserId: String(rows[i][1]),
+        displayName: String(rows[i][2] || 'LINE用戶')
+      };
+    }
+  }
+  return { bound: false };
+}
+
+function handleManualLinePush(ss, params) {
+  const sent = sendLinePushMessage(ss, params.lineUserId, params.message, params.channelAccessToken);
+  return { sent };
 }
 
 /**
@@ -238,6 +401,13 @@ function purgeExpiredReservations(ss) {
     let meta = {};
     try { meta = JSON.parse(extraRaw); } catch (e) {}
     if (meta.paymentStatus === '待櫃檯繳費' && meta.paymentDeadline && todayStr > meta.paymentDeadline) {
+      if (meta.lineUserId) {
+        sendLinePushMessage(
+          ss,
+          meta.lineUserId,
+          `❌【逾期未繳自動刪單通知】\n您在「${rows[i][3]}」預訂於 ${meta.pickupDate} 取餐之訂單 #${rows[i][1]}，因未於取餐日前兩天（${meta.paymentDeadline}）前至櫃檯繳清現金，系統已自動取消並刪除此筆訂單。`
+        );
+      }
       purgedIds.push(String(rows[i][0]));
       orderSheet.deleteRow(i + 1);
     }
@@ -246,9 +416,10 @@ function purgeExpiredReservations(ss) {
 }
 
 function getInitBundle(ss, params) {
+  const props = PropertiesService.getScriptProperties();
   const stores = sheetToObjects(ss.getSheetByName('Stores'));
   const menus = sheetToObjects(ss.getSheetByName('Menus'));
-  const orders = sheetToObjects(ss.getSheetByName('Orders')).reverse().slice(0, 60).map(enrichOrderObject);
+  const orders = sheetToObjects(ss.getSheetByName('Orders')).reverse().slice(0, 80).map(enrichOrderObject);
 
   const enrichedStores = stores.map(s => {
     const storeMenus = menus
@@ -278,12 +449,15 @@ function getInitBundle(ss, params) {
     else if (loadPct >= 50) loadState = 'MODERATE';
 
     const avgPrep = Number(s.avgPrepMinutes) || calcDynamicPrepMinutes(active, maxCap);
+    const cutleryPrice = s.cutleryPrice !== undefined && s.cutleryPrice !== '' ? Number(s.cutleryPrice) : 1;
+
     const storeObj = {
       ...s,
       maxCapacityPer15Min: maxCap,
       activeOrders: active,
       avgPrepMinutes: avgPrep,
       rating: Number(s.rating) || 4.7,
+      cutleryPrice: Math.max(0, cutleryPrice),
       loadPercentage: loadPct,
       loadState: loadState,
       menus: storeMenus
@@ -299,6 +473,11 @@ function getInitBundle(ss, params) {
       stores: enrichedStores,
       aiRecommendations,
       orders,
+      lineDevInfo: {
+        botBasicId: props.getProperty('LINE_BOT_BASIC_ID') || '',
+        liffId: props.getProperty('LINE_LIFF_ID') || '',
+        hasToken: Boolean(props.getProperty('LINE_CHANNEL_ACCESS_TOKEN'))
+      },
       serverTime: Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss')
     }
   };
@@ -338,7 +517,7 @@ function computeAiTrafficRecommendations(stores) {
     if (congested.length > 0 && availableWithPromo.length > 0) {
       const busyStore = congested[0];
       const targetStore = availableWithPromo[0];
-      const timeSaved = Math.max(5, Number(busyStore.avgPrepMinutes) - Number(targetStore.avgPrepMinutes));
+      const timeSaved = Math.max(1, Number(busyStore.avgPrepMinutes) - Number(targetStore.avgPrepMinutes));
 
       recommendations[campus] = {
         hasAlert: true,
@@ -364,7 +543,7 @@ function computeAiTrafficRecommendations(stores) {
 }
 
 /**
- * 處理學生掃碼點餐與店家 POS 點餐（含預訂電話、免洗餐具+$1、遠期現金期限驗證）
+ * 處理學生掃碼點餐與店家 POS 點餐（自動觸發 LINE Messaging API Push 通知）
  */
 function handleOrderSubmission(ss, params) {
   const orderSheet = ss.getSheetByName('Orders');
@@ -380,6 +559,7 @@ function handleOrderSubmission(ss, params) {
     ? String(params.pickupNumber).trim()
     : (campusPrefix + Math.floor(100 + Math.random() * 899));
   const nowStr = Utilities.formatDate(new Date(), 'Asia/Taipei', 'HH:mm:ss');
+  const todayDateStr = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
 
   const orderSource = params.orderSource || '📱 掃碼點餐';
   const customerNote = params.customerNote || '外帶自取';
@@ -388,11 +568,11 @@ function handleOrderSubmission(ss, params) {
     needCutlery: Boolean(params.needCutlery),
     cutleryFee: Number(params.cutleryFee) || 0,
     isReservation: Boolean(params.isReservation),
-    pickupDate: params.pickupDate || '',
-    pickupTime: params.pickupTime || '',
+    pickupDate: params.pickupDate || todayDateStr,
+    pickupTime: params.pickupTime || nowStr.slice(0, 5),
     customerPhone: params.customerPhone || '',
     paymentDeadline: params.paymentDeadline || '',
-    paymentStatus: params.paymentStatus || '已確認',
+    paymentStatus: params.paymentStatus || '已付款',
     notifyCount: Number(params.notifyCount) || 0,
     lineUserId: params.lineUserId || ''
   };
@@ -431,6 +611,16 @@ function handleOrderSubmission(ss, params) {
     }
   }
 
+  // 若顧客已綁定 LINE User ID，透過 LINE Messaging API 推播真實訊息
+  if (extraMeta.lineUserId) {
+    const itemSummary = (params.items || []).map(i => `${i.name} x${i.qty}`).join('、');
+    let lineText = `🟢【東吳學餐 MealFlow 訂單成立】\n取餐號碼：#${pickupNumber}\n餐廳：${params.storeName}\n餐點：${itemSummary}\n取餐時間：${params.pickupTimeSlot}\n總計：NT$ ${params.finalTotal} (${params.paymentMethod})`;
+    if (extraMeta.paymentStatus === '待櫃檯繳費' && extraMeta.paymentDeadline) {
+      lineText += `\n\n⚠️ 提醒您：請於 ${extraMeta.paymentDeadline} 23:59 前親至櫃檯繳清現金，逾期未繳系統將自動取消訂單。`;
+    }
+    sendLinePushMessage(ss, extraMeta.lineUserId, lineText);
+  }
+
   return {
     order: {
       orderId,
@@ -455,9 +645,6 @@ function handleOrderSubmission(ss, params) {
   };
 }
 
-/**
- * 店家儲存/更新該餐廳的完整菜單 (`saveStoreMenus`)
- */
 function saveStoreMenus(ss, params) {
   const storeId = String(params.storeId || '');
   const newMenus = Array.isArray(params.menus) ? params.menus : [];
@@ -503,9 +690,6 @@ function saveStoreMenus(ss, params) {
   return getInitBundle(ss, {});
 }
 
-/**
- * AI 智慧菜單辨識 (`aiParseMenu`)
- */
 function handleAiParseMenu(ss, params) {
   const rawText = String(params.rawText || '');
   const imageBase64 = String(params.imageBase64 || '');
@@ -581,6 +765,9 @@ function updateStoreSettings(ss, params) {
         storeSheet.getRange(i + 1, 6).setValue(act);
         storeSheet.getRange(i + 1, 7).setValue(prep);
       }
+      if (params.cutleryPrice !== undefined) {
+        storeSheet.getRange(i + 1, 14).setValue(Math.max(0, Number(params.cutleryPrice)));
+      }
       break;
     }
   }
@@ -588,7 +775,7 @@ function updateStoreSettings(ss, params) {
 }
 
 /**
- * 更新訂單狀態（支援重複按「🔔 通知取餐」累加 notifyCount）
+ * 更新訂單狀態（並自動透過 LINE Messaging API 推播取餐或完成通知）
  */
 function updateOrderState(ss, params) {
   const orderSheet = ss.getSheetByName('Orders');
@@ -601,9 +788,10 @@ function updateOrderState(ss, params) {
     if (String(data[i][0]) === String(params.orderId)) {
       previousStatus = String(data[i][13]);
       targetStoreId = String(data[i][2]);
+      const pickupNo = String(data[i][1]);
+      const storeName = String(data[i][3]);
       orderSheet.getRange(i + 1, 14).setValue(params.newStatus);
 
-      // 更新 extraMetaJson 內的 notifyCount
       let meta = {};
       try { meta = JSON.parse(data[i][16] || '{}'); } catch (e) {}
       if (params.notifyCount !== undefined) {
@@ -613,6 +801,22 @@ function updateOrderState(ss, params) {
       }
       if (orderSheet.getLastColumn() >= 17) {
         orderSheet.getRange(i + 1, 17).setValue(JSON.stringify(meta));
+      }
+
+      if (meta.lineUserId) {
+        if (params.newStatus === '可取餐') {
+          sendLinePushMessage(
+            ss,
+            meta.lineUserId,
+            `🔔【餐點完成取餐通知】\n您的取餐號碼：#${pickupNo}\n餐廳：${storeName}\n狀態：餐點已製作完成（第 ${meta.notifyCount || 1} 次呼叫），請直接前往櫃檯自取！`
+          );
+        } else if (params.newStatus === '已完成') {
+          sendLinePushMessage(
+            ss,
+            meta.lineUserId,
+            `✅【訂單完成結單通知】\n感謝您於「${storeName}」用餐（單號 #${pickupNo}），祝您用餐愉快！`
+          );
+        }
       }
       break;
     }
@@ -639,9 +843,6 @@ function updateOrderState(ss, params) {
   return getInitBundle(ss, {});
 }
 
-/**
- * 標記遠期預訂訂單「已至櫃檯繳清現金」
- */
 function markReservationPaid(ss, params) {
   const orderSheet = ss.getSheetByName('Orders');
   const data = orderSheet.getDataRange().getValues();
@@ -649,9 +850,16 @@ function markReservationPaid(ss, params) {
     if (String(data[i][0]) === String(params.orderId)) {
       let meta = {};
       try { meta = JSON.parse(data[i][16] || '{}'); } catch (e) {}
-      meta.paymentStatus = '已至櫃檯繳清';
+      meta.paymentStatus = '已付款';
       if (orderSheet.getLastColumn() >= 17) {
         orderSheet.getRange(i + 1, 17).setValue(JSON.stringify(meta));
+      }
+      if (meta.lineUserId) {
+        sendLinePushMessage(
+          ss,
+          meta.lineUserId,
+          `💵【櫃檯付款成功通知】\n您在「${data[i][3]}」的訂單 #${data[i][1]} (NT$ ${data[i][9]}) 已於櫃檯完成現金收款確認！`
+        );
       }
       break;
     }
@@ -659,14 +867,20 @@ function markReservationPaid(ss, params) {
   return getInitBundle(ss, {});
 }
 
-/**
- * 取消並刪除訂單（含逾期未繳自動刪單或店家取消）
- */
 function cancelOrderById(ss, params) {
   const orderSheet = ss.getSheetByName('Orders');
   const data = orderSheet.getDataRange().getValues();
   for (let i = data.length - 1; i >= 1; i--) {
     if (String(data[i][0]) === String(params.orderId)) {
+      let meta = {};
+      try { meta = JSON.parse(data[i][16] || '{}'); } catch (e) {}
+      if (meta.lineUserId) {
+        sendLinePushMessage(
+          ss,
+          meta.lineUserId,
+          `❌【訂單取消通知】\n您在「${data[i][3]}」的訂單 #${data[i][1]} 已被取消。`
+        );
+      }
       orderSheet.deleteRow(i + 1);
       break;
     }
@@ -706,7 +920,7 @@ function runTrafficSimulation(ss, params) {
 function handleAiConcierge(ss, params) {
   const bundleObj = getInitBundle(ss, {}).bundle;
   const campus = params.campus || '雙溪校區';
-  const userQuery = (params.query || '推薦快取高CP值餐點').trim();
+  const userQuery = (params.query || '').trim();
   const campusStores = bundleObj.stores.filter(s => s.campus === campus);
 
   const props = PropertiesService.getScriptProperties();
@@ -724,16 +938,16 @@ function handleAiConcierge(ss, params) {
         menus: s.menus.map(m => ({ id: m.id, name: m.name, price: m.price }))
       }));
 
-      const prompt = `你是東吳大學「MealFlow 學餐 AI 流量管制與選餐顧問」。
+      const prompt = `你是東吳大學「MealFlow 學餐 AI 選餐與客服顧問」。
 目前校區：${campus}
-學生的選餐需求：「${userQuery}」
+學生的輸入：「${userQuery}」
 即時學餐佇列與菜單數據：${JSON.stringify(storeContext)}
 
-請根據 M/M/1 佇列等待時間、分流優惠與學生需求，為學生挑選最適合的 1 家餐廳與 1 道主餐，並以純 JSON 格式回覆：
+請根據學生的輸入自然且精準地回答（若學生只是打招呼或詢問店家/規則，請自然對話回應，不要生硬套模板；若學生想找餐點，請根據實際等待時間與菜單推薦，絕不可捏造不存在的省時數據），並以純 JSON 格式回覆：
 {
-  "reasoning": "80字以內、具體說明為什麼推薦這家與這道菜",
-  "storeId": "店家ID",
-  "menuId": "餐點ID",
+  "reasoning": "自然、準確、針對學生問題的回答 (100字內)",
+  "storeId": "推薦店家ID (如 S02)",
+  "menuId": "推薦餐點ID (如 M04)",
   "engine": "Gemini 2.5 Flash Live AI"
 }`;
 
@@ -761,7 +975,7 @@ function handleAiConcierge(ss, params) {
 
   return {
     aiResult: {
-      reasoning: `根據 M/M/1 佇列分析，${bestStore.name} 目前僅需等待 ${bestStore.avgPrepMinutes} 分鐘，推薦點選「${bestMenu.name} ($${bestMenu.price})」。`,
+      reasoning: `目前「${campus}」以「${bestStore.name}」最為順暢（約 ${bestStore.avgPrepMinutes} 分鐘取餐），推薦點選人氣品項「${bestMenu.name} ($${bestMenu.price})」。`,
       storeId: bestStore.id,
       menuId: bestMenu.id,
       engine: 'MealFlow Queueing Utility Engine'

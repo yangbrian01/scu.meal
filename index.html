@@ -12,10 +12,10 @@
 <body>
 
   <div id="toast" class="toast"></div>
-  <!-- LINE 即時推播通知懸浮容器 -->
+  <!-- LINE Messaging API 即時推播通知懸浮容器 -->
   <div id="linePushContainer" class="line-push-container"></div>
 
-  <!-- 頂部導覽列 -->
+  <!-- 頂部導覽列（當處於 /store/ 全螢幕 POS 模式時由 CSS 自動隱藏，最大化平板收銀畫面） -->
   <header class="app-header">
     <div class="header-inner">
       <div class="brand-title-group">
@@ -59,9 +59,9 @@
           <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
             <div>
               <span style="font-size:0.72rem; font-weight:800; background:rgba(255,255,255,0.18); padding:2px 8px; border-radius:999px;">
-                ✨ MealFlow AI 選餐顧問
+                ✨ MealFlow AI 選餐與客服顧問
               </span>
-              <h3 style="font-size:1rem; font-weight:800; margin-top:4px;">不知道吃什麼？讓 AI 依即時排隊佇列幫你配餐</h3>
+              <h3 style="font-size:1rem; font-weight:800; margin-top:4px;">不知道吃什麼或想問取餐規則？讓 AI 依即時佇列幫你解答與配餐</h3>
             </div>
             <button type="button" class="ai-prompt-chip" onclick="promptGeminiKeyConfig()">⚙️ Gemini API 設定</button>
           </div>
@@ -71,11 +71,12 @@
             <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('💰 預算 $100 元以內、有分流優惠的最高 CP 值正餐')">💰 預算 $100 內最高 CP 值</button>
             <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('🌶️ 想吃韓式、椒麻或辣味重口味，且不用排隊的餐點')">🌶️ 想吃辣味重口味免排隊</button>
             <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('🥩 剛運動完想吃大份量肉類補充蛋白質')">🥩 大份量高蛋白肉食</button>
+            <button type="button" class="ai-prompt-chip" onclick="askAiConcierge('📋 請問預訂取餐與現金付款規則是什麼？')">📋 預訂與現金付款規則</button>
           </div>
 
           <div style="display:flex; gap:8px; margin-top:4px;">
-            <input type="text" id="aiUserQueryInput" class="select-input" style="flex:1; background:rgba(255,255,255,0.95); border:none;" placeholder="輸入你的需求（例：想吃烏龍麵或水餃、不想等超過5分鐘）..." onkeydown="if(event.key==='Enter') askAiConcierge()">
-            <button type="button" class="btn-tip-action" onclick="askAiConcierge()">🧠 AI 分析推薦</button>
+            <input type="text" id="aiUserQueryInput" class="select-input" style="flex:1; background:rgba(255,255,255,0.95); border:none;" placeholder="可自然對話或輸入需求（例：你好、推薦 $100 內不排隊的麵、預訂怎麼付錢）..." onkeydown="if(event.key==='Enter') askAiConcierge()">
+            <button type="button" class="btn-tip-action" onclick="askAiConcierge()">🧠 AI 分析回答</button>
           </div>
 
           <div id="aiConciergeResponse" class="ai-response-card"></div>
@@ -101,133 +102,47 @@
       <div id="singleTicketContainer"></div>
     </section>
 
-    <!-- ==================== 路由 4：店家櫃檯 POS + KDS + AI 菜單管理後台 (/store/) ==================== -->
+    <!-- ==================== 路由 4：SUNMI 風格全螢幕平板 POS + 訂單分天 + AI 分析 + 設定 (/store/) ==================== -->
     <section id="viewStore" class="view-section">
-      <div class="demo-sim-bar">
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <span style="font-size:0.82rem; font-weight:800; color:#FBBF24;">⚡ 評審 Demo 流量模擬：</span>
-          <button class="demo-btn peak" onclick="triggerTrafficSim('PEAK')">🔥 模擬 12:10 尖峰塞車</button>
-          <button class="demo-btn" onclick="triggerTrafficSim('NORMAL')">🌿 恢復離峰順暢</button>
-        </div>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:0.78rem; color:#D1D5DB;">當前管理店家：</span>
-          <select id="merchantSelect" class="select-input" style="width:auto; padding:5px 10px;" onchange="onMerchantStoreChange()"></select>
-        </div>
-      </div>
+      <!-- 左側深色直向導覽欄 (Sidebar Rail) -->
+      <aside class="pos-sidebar-rail">
+        <a href="./" class="rail-brand" title="返回系統入口">🍱</a>
 
-      <!-- 店家 4 大功能分頁 -->
-      <div class="store-mode-tabs">
-        <button type="button" class="store-mode-btn active" id="tabBtnStore-pos" onclick="switchStoreTabMode('pos')">
-          🖥️ 櫃檯 POS 點餐收銀機
+        <button type="button" class="rail-nav-btn active" id="railBtn-pos" onclick="switchStoreTabMode('pos')">
+          <span class="rail-icon">🖥️</span>
+          <span>收銀台</span>
         </button>
-        <button type="button" class="store-mode-btn" id="tabBtnStore-kds" onclick="switchStoreTabMode('kds')">
-          👨‍🍳 廚房 KDS 出單佇列 (<span id="kdsPendingBadge">0</span>)
+
+        <button type="button" class="rail-nav-btn" id="railBtn-kds" onclick="switchStoreTabMode('kds')">
+          <span class="rail-icon">📋</span>
+          <span>訂單</span>
+          <span id="railKdsBadge" class="rail-badge" style="display:none;">0</span>
         </button>
-        <button type="button" class="store-mode-btn" id="tabBtnStore-menu" onclick="switchStoreTabMode('menu')">
-          🍔 菜單管理 & 📸 AI 掃描匯入
+
+        <button type="button" class="rail-nav-btn" id="railBtn-analytics" onclick="switchStoreTabMode('analytics')">
+          <span class="rail-icon">📊</span>
+          <span>AI分析</span>
         </button>
-        <button type="button" class="store-mode-btn" id="tabBtnStore-promo" onclick="switchStoreTabMode('promo')">
-          🤖 AI 動態分流與產能設定
+
+        <button type="button" class="rail-nav-btn" id="railBtn-settings" onclick="switchStoreTabMode('settings')">
+          <span class="rail-icon">⚙️</span>
+          <span>設定</span>
         </button>
-      </div>
 
-      <!-- 分頁 1：商用雙欄櫃檯 POS 收銀終端機 -->
-      <div id="storePanel-pos">
-        <div id="posTerminalContainer"></div>
-      </div>
-
-      <!-- 分頁 2：廚房 KDS 出單佇列 -->
-      <div id="storePanel-kds" style="display:none;">
-        <div class="merchant-box">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-            <h3 style="font-size:1.05rem; font-weight:900;">📋 即時廚房訂單佇列 (<span id="merchActiveCount">0</span> 筆進行中｜含手機掃碼、預訂與櫃檯 POS)</h3>
-            <div style="display:flex; gap:8px;">
-              <button class="filter-chip" onclick="syncCloud(true)">🔄 刷新訂單</button>
-              <button class="filter-chip" onclick="speakSample()">🔊 測試語音讀單与鈴聲</button>
-            </div>
-          </div>
-          <div id="merchantOrderList"></div>
-        </div>
-      </div>
-
-      <!-- 分頁 3：真實菜單編輯器 & 📸 AI 視覺掃描一鍵匯入 -->
-      <div id="storePanel-menu" style="display:none;">
-        <div class="merchant-box" style="background:linear-gradient(135deg, #EEF2FF 0%, #FFF7ED 100%); border-color:#C7D2FE;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-            <div>
-              <div style="font-size:0.74rem; font-weight:900; color:var(--indigo);">目前編輯的餐廳菜單</div>
-              <h3 style="font-size:1.2rem; font-weight:900;" id="adminCurrentStoreTitle">載入中...</h3>
-              <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">
-                支援手動新增/修改品項、自訂必選/多選客製化群組，或使用 AI 掃描整張紙本菜單自動建檔！
-              </p>
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button type="button" class="btn-tip-action" style="background:var(--indigo); box-shadow:0 4px 12px rgba(79,70,229,0.3);" onclick="openAiMenuScannerModal()">
-                📸 AI 辨識菜單一鍵匯入
-              </button>
-              <button type="button" class="btn-tip-action" onclick="openMenuEditorModal(-1)">
-                ➕ 手動新增餐點
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="merchant-box">
-          <div id="adminMenuListContainer"></div>
-          <button type="button" id="btnSaveMenuToCloud" class="btn-tip-action" style="width:100%; padding:14px; font-size:0.98rem; margin-top:14px;" onclick="saveStoreMenusToServer()">
-            💾 儲存此餐廳完整菜單至雲端資料庫
+        <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px; width:100%; align-items:center;">
+          <button type="button" class="rail-nav-btn" onclick="syncCloud(true)" title="立即同步雲端">
+            <span class="rail-icon">🔄</span>
+            <span>同步</span>
           </button>
         </div>
-      </div>
+      </aside>
 
-      <!-- 分頁 4：AI 分流優惠與產能設定 -->
-      <div id="storePanel-promo" style="display:none;">
-        <div class="merchant-box">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-            <div>
-              <h3 style="font-size:0.98rem; font-weight:800;">🎁 當同校區友店塞車時，本店提供的 AI 分流優惠：</h3>
-              <span style="font-size:0.78rem; color:var(--brand-dark); font-weight:700;" id="merchPredictLabel">🧠 AI 佇列推算載入中...</span>
-            </div>
-            <button type="button" class="btn-tip-action" style="background:var(--indigo);" onclick="runMerchantAiAutoOptimize()">
-              🧠 AI 自動診斷佇列並套用最佳分流策略
-            </button>
-          </div>
-
-          <div class="promo-pills">
-            <button class="promo-pill-btn" id="pBtn-none" onclick="setMerchantPromo('none')">
-              <div style="font-weight:800; font-size:0.88rem;">⏸️ 暫不提供優惠</div>
-              <div style="font-size:0.75rem; color:var(--text-secondary);">現場滿載忙碌時關閉</div>
-            </button>
-            <button class="promo-pill-btn" id="pBtn-gift" onclick="setMerchantPromo('gift')">
-              <div style="font-weight:800; font-size:0.88rem; color:var(--brand);">🎁 免費招待附餐/飲品</div>
-              <div style="font-size:0.75rem; color:var(--text-secondary);">低食材成本・高分流吸引力</div>
-            </button>
-            <button class="promo-pill-btn" id="pBtn-discount" onclick="setMerchantPromo('discount')">
-              <div style="font-weight:800; font-size:0.88rem; color:var(--green);">💰 每單現折 $10 元</div>
-              <div style="font-size:0.75rem; color:var(--text-secondary);">直接折現吸引猶豫學生</div>
-            </button>
-            <button class="promo-pill-btn" id="pBtn-points" onclick="setMerchantPromo('points')">
-              <div style="font-weight:800; font-size:0.88rem; color:var(--amber);">⚡ 贈送雙倍 MealPoints</div>
-              <div style="font-size:0.75rem; color:var(--text-secondary);">不折損毛利・提升回購率</div>
-            </button>
-          </div>
-
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);">
-            <div>
-              <label class="field-label">🍳 目前待製單數 (activeOrders)</label>
-              <input type="number" id="merchActiveInput" class="select-input" min="0" max="99" value="4">
-            </div>
-            <div>
-              <label class="field-label">⚙️ 每 15 分鐘最大產能上限</label>
-              <input type="number" id="merchCapInput" class="select-input" min="5" max="100" value="20">
-            </div>
-          </div>
-
-          <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
-            <input type="text" id="merchCustomText" class="select-input" style="flex:1; min-width:200px;" placeholder="輸入分流優惠顯示文案">
-            <button class="btn-tip-action" id="btnSaveMerchant" onclick="saveMerchantPromo()">💾 儲存並同步雲端</button>
-          </div>
-        </div>
+      <!-- 右側全螢幕主舞台 (100dvh 零外層捲動) -->
+      <div class="pos-main-stage">
+        <div id="storePanel-pos" style="display:flex; flex-direction:column; height:100%; overflow:hidden;"></div>
+        <div id="storePanel-kds" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
+        <div id="storePanel-analytics" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
+        <div id="storePanel-settings" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
       </div>
     </section>
 
@@ -285,137 +200,86 @@
     </div>
   </div>
 
-  <!-- ==================== 彈窗 C：店家單品菜單與客製化群組編輯器 (`#menuEditorModal`) ==================== -->
-  <div id="menuEditorModal" class="modal-overlay" onclick="if(event.target===this) closeMenuEditorModal()">
-    <div class="modal-card" style="max-width:540px;">
-      <div class="modal-header" style="background:#F9FAFB;">
-        <h3 style="font-size:1.15rem; font-weight:900;" id="editorModalTitle">編輯品項</h3>
-        <button type="button" onclick="closeMenuEditorModal()" style="border:none; background:#E5E7EB; width:32px; height:32px; border-radius:50%; font-weight:900;">✕</button>
-      </div>
-      <div class="modal-body">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-          <div>
-            <label class="field-label">分類區塊 (如: 日式蓋飯、水餃) *</label>
-            <input type="text" id="editItemCategory" class="select-input" placeholder="例如：招牌主餐">
-          </div>
-          <div>
-            <label class="field-label">特色標籤 (選填)</label>
-            <input type="text" id="editItemTag" class="select-input" placeholder="例如：🔥 必點人氣">
-          </div>
-        </div>
-        <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
-          <div>
-            <label class="field-label">餐點品項名稱 *</label>
-            <input type="text" id="editItemName" class="select-input" placeholder="例如：炙燒起司牛五花丼">
-          </div>
-          <div>
-            <label class="field-label">價格 (NT$) *</label>
-            <input type="number" id="editItemPrice" class="select-input" placeholder="115">
-          </div>
-        </div>
-        <div style="margin-bottom:14px;">
-          <label class="field-label">圖片網址 (選填)</label>
-          <input type="text" id="editItemImage" class="select-input" placeholder="https://...">
-        </div>
-
-        <hr style="border:none; border-top:1px solid var(--border); margin:14px 0;">
-
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <strong style="font-size:0.95rem; color:var(--brand-dark);">🛒 客製化選項群組設定</strong>
-          <button type="button" onclick="addOptionGroup()" style="border:none; background:var(--brand-light); color:var(--brand-dark); padding:5px 10px; border-radius:8px; font-size:0.78rem; font-weight:800;">＋ 新增選項群組</button>
-        </div>
-        <div id="optionsBuilderContainer"></div>
-      </div>
-      <div class="modal-footer" style="display:flex; gap:10px;">
-        <button type="button" class="filter-chip" style="flex:1; padding:12px;" onclick="closeMenuEditorModal()">取消</button>
-        <button type="button" class="btn-tip-action" style="flex:1.5; padding:12px;" onclick="saveMenuItemToLocalDraft()">✅ 暫存此品項</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== 彈窗 D：📸 AI 智慧辨識菜單一鍵匯入 (`#aiMenuScannerModal`) ==================== -->
-  <div id="aiMenuScannerModal" class="modal-overlay" onclick="if(event.target===this) closeAiMenuScannerModal()">
-    <div class="modal-card" style="max-width:580px;">
-      <div class="modal-header" style="background:linear-gradient(135deg, #1E1B4B 0%, #312E81 100%); color:#FFFFFF;">
+  <!-- ==================== 彈窗 C：預訂/待收款訂單「觸控數字鍵盤收款」視窗 (`#orderPayModal`, z-index: 9600) ==================== -->
+  <div id="orderPayModal" class="modal-overlay" onclick="if(event.target===this) closeOrderPayModal()">
+    <div class="modal-card" style="max-width:440px;">
+      <div class="modal-header" style="background:#0F172A; color:#FFFFFF;">
         <div>
-          <span style="font-size:0.7rem; font-weight:800; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:999px;">Gemini Vision OCR + 結構化語意解析</span>
-          <h3 style="font-size:1.15rem; font-weight:900; margin-top:3px;">📸 AI 智慧辨識菜單・一鍵自動建檔</h3>
+          <span style="font-size:0.7rem; font-weight:800; color:#38BDF8;">POS Cash & Payment Collection</span>
+          <h3 style="font-size:1.15rem; font-weight:900;">💵 訂單收款與觸控找零</h3>
         </div>
-        <button type="button" onclick="closeAiMenuScannerModal()" style="border:none; background:rgba(255,255,255,0.2); color:#fff; width:32px; height:32px; border-radius:50%; font-weight:900;">✕</button>
+        <button type="button" onclick="closeOrderPayModal()" style="border:none; background:rgba(255,255,255,0.18); color:#fff; width:32px; height:32px; border-radius:50%; font-weight:900;">✕</button>
       </div>
-      <div class="modal-body">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-          <label style="display:inline-flex; align-items:center; gap:6px; background:#EEF2FF; color:#4338CA; border:1.5px dashed #818CF8; padding:8px 14px; border-radius:10px; font-size:0.82rem; font-weight:800; cursor:pointer;">
-            📷 上傳/拍攝紙本菜單照片
-            <input type="file" accept="image/*" style="display:none;" onchange="handleMenuImageUpload(event)">
-          </label>
-          <button type="button" class="filter-chip" style="color:var(--brand-dark); border-color:#FDBA74; background:#FFF7ED;" onclick="fillSampleRawMenuText()">
-            ✨ 載入範例紙本菜單測試 AI 辨識
-          </button>
-        </div>
-
-        <img id="aiMenuImagePreview" src="" style="display:none; width:100%; max-height:160px; object-fit:contain; border-radius:10px; border:1px solid var(--border); margin-bottom:10px;">
-
-        <label class="field-label">📄 或直接貼上菜單文字 / 價目表（AI 會自動分析分類、品名、價格並自動生成客製化群組）：</label>
-        <textarea id="aiMenuRawText" rows="5" class="select-input" style="font-family:inherit; resize:vertical;" placeholder="例如：&#10;== 招牌丼飯 ==&#10;炙燒明太子鮭魚丼 $145&#10;蔥鹽松阪豬丼 $125&#10;== 手工水餃 ==&#10;剝皮辣椒水餃 (10顆) $80"></textarea>
-
-        <button type="button" class="btn-tip-action" style="width:100%; margin-top:10px; background:var(--indigo); padding:12px;" onclick="runAiMenuRecognition()">
-          🧠 開始 AI 掃描整理菜單
-        </button>
-
-        <div id="aiScannedPreviewBox"></div>
-      </div>
+      <div class="modal-body" id="orderPayModalBody"></div>
     </div>
   </div>
 
-  <!-- ==================== 彈窗 E：💚 LINE 官方帳號綁定與即時通知中心 (`#lineBindModal`) ==================== -->
+  <!-- ==================== 彈窗 D：💚 LINE Developers Messaging API 官方帳號綁定中心 (`#lineBindModal`, z-index: 9600) ==================== -->
   <div id="lineBindModal" class="modal-overlay" onclick="if(event.target===this) closeLineBindModal()">
-    <div class="modal-card" style="max-width:500px;">
+    <div class="modal-card" style="max-width:520px;">
       <div class="modal-header" style="background:#06C755; color:#FFFFFF;">
         <div>
-          <span style="font-size:0.7rem; font-weight:800; background:rgba(255,255,255,0.22); padding:2px 8px; border-radius:999px;">LINE Official Notification Center</span>
-          <h3 style="font-size:1.15rem; font-weight:900; margin-top:3px;">💬 綁定 LINE 接收取餐與預訂提醒</h3>
+          <span style="font-size:0.7rem; font-weight:800; background:rgba(255,255,255,0.22); padding:2px 8px; border-radius:999px;">LINE Developers Messaging API</span>
+          <h3 style="font-size:1.15rem; font-weight:900; margin-top:3px;">💬 綁定 LINE 官方帳號接收即時 Push 通知</h3>
         </div>
         <button type="button" onclick="closeLineBindModal()" style="border:none; background:rgba(255,255,255,0.22); color:#fff; width:32px; height:32px; border-radius:50%; font-weight:900;">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:12px;">
-          綁定後，當<strong>餐點製作完成可取餐</strong>、<strong>超過 2 天之預訂單需至櫃檯繳費提醒</strong>、<strong>訂單完成或逾期取消</strong>時，系統皆會自動推播通知！
-        </p>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-          <div>
-            <label class="field-label">👤 您的 LINE 顯示暱稱</label>
-            <input type="text" id="lineInputName" class="select-input" placeholder="例如：王小明">
+        <div style="background:#F0FDF4; border:1.5px solid #86EFAC; border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:0.82rem; font-weight:900; color:#065F46; margin-bottom:6px;">
+            📲 方式一：透過 LINE 官方帳號 Webhook 自動綁定 (推薦)
           </div>
-          <div>
-            <label class="field-label">🆔 LINE ID / 學號綁定碼</label>
-            <input type="text" id="lineInputId" class="select-input" placeholder="例如：@scu_ming">
+          <p style="font-size:0.78rem; color:#047857; line-height:1.45; margin-bottom:8px;">
+            點擊下方按鈕開啟 LINE 並傳送您的 4 位數綁定碼給官方帳號，LINE Webhook 會自動擷取您的 <code>userId</code> 完成綁定：
+          </p>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#FFFFFF; padding:8px 12px; border-radius:10px; border:1px dashed #34D399; margin-bottom:8px;">
+            <span style="font-size:0.8rem; font-weight:800; color:var(--text-secondary);">您的專屬綁定碼：</span>
+            <strong id="lineBindCodeDisplay" style="font-size:1.35rem; font-weight:950; color:#059669; letter-spacing:2px;">8888</strong>
           </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label class="field-label">🔗 選填：自訂 LINE Notify / Webhook 轉發網址</label>
-          <input type="text" id="lineInputWebhook" class="select-input" placeholder="留空即使用內建模擬推播視窗">
-        </div>
-        <div style="display:flex; gap:8px; margin-bottom:14px;">
-          <button type="button" class="btn-line" style="flex:1; justify-content:center; padding:11px;" onclick="saveLineBindConfig()">
-            💚 一鍵完成綁定並發送測試通知
-          </button>
-          <button type="button" class="filter-chip" onclick="requestBrowserNotificationPermission()">
-            🔔 開啟手機背景通知權限
-          </button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a id="lineOaDeepLinkBtn" href="https://line.me" target="_blank" class="btn-line" style="flex:1; justify-content:center; text-decoration:none; padding:9px;">
+              🚀 開啟 LINE 傳送綁定碼
+            </a>
+            <button type="button" class="filter-chip" style="border-color:#059669; color:#065F46;" onclick="verifyLineWebhookBinding()">
+              🔄 檢查 Webhook 綁定狀態
+            </button>
+          </div>
         </div>
 
-        <hr style="border:none; border-top:1px solid var(--border); margin:12px 0;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <strong style="font-size:0.86rem; color:#166534;">📬 最近 LINE 推播通知紀錄匣</strong>
-          <button type="button" onclick="unbindLineAccount()" style="border:none; background:transparent; color:var(--text-muted); font-size:0.74rem; text-decoration:underline;">解除綁定</button>
+        <div style="background:#F8FAFC; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:0.8rem; font-weight:900; color:var(--text-primary); margin-bottom:8px;">
+            🔑 方式二：直接綁定 LINE Developers User ID 或開啟推播模擬
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:8px; margin-bottom:8px;">
+            <div>
+              <label class="field-label">👤 顯示名稱</label>
+              <input type="text" id="lineInputName" class="select-input" placeholder="例如：王小明">
+            </div>
+            <div>
+              <label class="field-label">🆔 LINE User ID (U開頭 33 碼，可留空自動產生)</label>
+              <input type="text" id="lineInputId" class="select-input" placeholder="U1234567890abcdef...">
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-line" style="flex:1; justify-content:center; padding:10px;" onclick="saveLineBindConfig()">
+              💚 立即綁定並發送測試 Push
+            </button>
+            <button type="button" class="filter-chip" onclick="requestBrowserNotificationPermission()">
+              🔔 授權瀏覽器通知
+            </button>
+          </div>
         </div>
-        <div id="lineLogsContainer" style="max-height:180px; overflow-y:auto;"></div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <strong style="font-size:0.84rem; color:#166534;">📬 最近 LINE Push API 推播紀錄匣</strong>
+          <button type="button" onclick="unbindLineAccount()" style="border:none; background:transparent; color:var(--text-muted); font-size:0.74rem; text-decoration:underline; cursor:pointer;">解除綁定</button>
+        </div>
+        <div id="lineLogsContainer" style="max-height:150px; overflow-y:auto;"></div>
       </div>
     </div>
   </div>
 
-  <!-- ==================== 彈窗 F：🔔 學生取餐手機震動與響鈴全螢幕強提醒 (`#pickupAlertModal`) ==================== -->
+  <!-- ==================== 彈窗 E：🔔 學生取餐手機震動與響鈴全螢幕強提醒 (`#pickupAlertModal`) ==================== -->
   <div id="pickupAlertModal" class="modal-overlay" onclick="if(event.target===this) closePickupAlertModal()">
     <div class="modal-card" style="max-width:400px; border:3px solid var(--green);">
       <div class="modal-body" id="pickupAlertContent"></div>
