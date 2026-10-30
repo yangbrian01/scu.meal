@@ -1,16 +1,14 @@
 /**
- * 東吳學餐 MealFlow v8.0
- * 1. 現代化美型店家介面 (/store/)：僅在「櫃檯點餐 (POS)」鎖定外層不捲動 (body.pos-no-scroll)，切換至「訂單管理 / AI 分析 / 店務設定」皆可正常自由捲動
- * 2. 點選「實收金額」彈出觸控數字鍵盤 (#posCashNumpadModal)，主畫面乾淨不擁擠、不跳出系統鍵盤
- * 3. LINE Login OAuth 2.1 綁定 (VocabMaster 架構，免 Webhook) + Flex Message 推播，支援「店家選填綁定專屬官方 LINE，未綁定自動使用系統主預設官方 LINE」
- * 4. 付款方式精簡為「現場現金、LINE Pay、街口支付」三種
+ * 東吳學餐 MealFlow v8.1 (Security & Cloud Sync Patched)
+ * - 移除前端硬編碼 LINE Secret / Channel Access Token，杜絕 GitGuardian 洩漏警報
+ * - 修正 syncCloud() 與 code.gs getInitBundle() 之 bundle.{stores, orders} 對接
  */
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzVXQRKZfnhgM_BhW6pgy1VOCg7YmCdfnAdHOS_9Tt7agxQa2r69hwg1UGL73gpoVwp/exec';
+// Channel ID 為公開 OAuth 識別碼（非機密）；Secret 與 Access Token 嚴禁寫入前端原始碼，統一由後端 GAS ScriptProperties 託管
 const DEFAULT_LINE_CLIENT_ID = localStorage.getItem('mealflow_system_line_client_id') || '2012260287';
-const DEFAULT_LINE_CLIENT_SECRET = 'e78839eba4d3aa7d4ec65633924de226';
-const DEFAULT_LINE_CHANNEL_TOKEN = 'rPsZmKQjS70tezeGNsf5+lo1QZvRSCndTCG+iCDHsTGCOSqomxt5uVv3AOM4qRq384mKSkWeK+OatPl3p+NRBnuSB8I5wAn8dRR5GAUatNxM44Gc2POkD6pTHtAFlmahEeYbstNW0s06t4S1NkAsZAdB04t89/1O/w1cDnyilFU=';
-
+const DEFAULT_LINE_CLIENT_SECRET = '';
+const DEFAULT_LINE_CHANNEL_TOKEN = '';
 const STORE_ICONS = {
   'S01': '🍙', 'S02': '🍱', 'S03': '🥟', 'S04': '🍗',
   'S05': '🍛', 'S06': '🥩', 'S07': '🍜'
@@ -286,7 +284,17 @@ function saveCachedOrders(orders) {
 function loadLineProfile() {
   try {
     const raw = localStorage.getItem('mealflow_line_profile_v8');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        isBound: Boolean(parsed.isBound),
+        lineDisplayName: parsed.lineDisplayName || '',
+        lineUserId: parsed.lineUserId || '',
+        email: parsed.email || '',
+        customClientId: parsed.customClientId || DEFAULT_LINE_CLIENT_ID,
+        channelAccessToken: '' // 不在前端 localStorage 保留長期 Token，統一由後端 GAS 託管
+      };
+    }
   } catch (e) {}
   return {
     isBound: false,
@@ -294,10 +302,9 @@ function loadLineProfile() {
     lineUserId: '',
     email: '',
     customClientId: DEFAULT_LINE_CLIENT_ID,
-    channelAccessToken: DEFAULT_LINE_CHANNEL_TOKEN
+    channelAccessToken: ''
   };
 }
-
 function saveLineProfile(profile) {
   try {
     localStorage.setItem('mealflow_line_profile_v8', JSON.stringify(profile));
@@ -423,7 +430,7 @@ function calcAiUtilityScore(store) {
   const waitScore = Math.max(0, 100 - (Number(store.avgPrepMinutes) || 5) * 3.4);
   let promoBonus = 0;
   if (store.promoMode === 'discount') promoBonus = 95;
-  else if (store.promoMode === 'gift') promoBonus = 90;
+  else if (store.promoMode === 'gift' || store.promoMode === 'freebie') promoBonus = 90;
   else if (store.promoMode === 'points') promoBonus = 75;
   const ratingScore = ((Number(store.rating) || 4.7) / 5.0) * 100;
   const raw = waitScore * 0.55 + promoBonus * 0.25 + ratingScore * 0.20;
@@ -642,7 +649,7 @@ async function pushLineNotification(eventType, title, message, order = null) {
   const targetUserId = (order && order.lineUserId) || state.lineProfile.lineUserId || '';
   const targetEmail = (order && order.customerEmail) || state.lineProfile.email || '';
   const storeObj = order ? state.stores.find(s => s.id === order.storeId) : state.stores.find(s => s.id === state.selectedStoreId);
-  const usingStoreCustomLine = Boolean(storeObj && storeObj.useCustomLineOa && storeObj.customLineChannelToken);
+  const usingStoreCustomLine = Boolean(storeObj && storeObj.useCustomLineOa);
   const senderLabel = usingStoreCustomLine ? `${storeObj.name} 官方 LINE` : 'MealFlow 預設官方 LINE / Email';
 
   const channels = [];
@@ -687,7 +694,7 @@ async function pushLineNotification(eventType, title, message, order = null) {
           storeName: order ? order.storeName : (storeObj ? storeObj.name : '東吳學餐 MealFlow'),
           statusText: order ? order.status : '即時通知',
           orderUrl,
-          channelAccessToken: (usingStoreCustomLine ? storeObj.customLineChannelToken : state.lineProfile.channelAccessToken) || ''
+          channelAccessToken: ''
         })
       });
     } catch (e) {}
@@ -1010,6 +1017,74 @@ window.addEventListener('DOMContentLoaded', () => {
   syncCloud(false);
 });
 
+function applyCloudBundle(data) {
+  const payload = (data && data.bundle) ? data.bundle : data;
+  if (!payload) return;
+
+  const cloudStores = Array.isArray(payload.stores) ? payload.stores : [];
+  if (cloudStores.length > 0) {
+    state.stores = cloudStores.map(cloudStore => {
+      const localMatch = state.stores.find(s => s.id === cloudStore.id);
+      return {
+        ...cloudStore,
+        cutleryPrice: cloudStore.cutleryPrice !== undefined
+          ? Number(cloudStore.cutleryPrice)
+          : (localMatch && localMatch.cutleryPrice !== undefined ? Number(localMatch.cutleryPrice) : 1),
+        useCustomLineOa: cloudStore.useCustomLineOa !== undefined
+          ? Boolean(cloudStore.useCustomLineOa)
+          : Boolean(localMatch && localMatch.useCustomLineOa),
+        customLineClientId: cloudStore.customLineClientId || (localMatch ? localMatch.customLineClientId : '') || '',
+        customLineClientSecret: '',
+        customLineChannelToken: '',
+        menus: (Array.isArray(cloudStore.menus) && cloudStore.menus.length > 0)
+          ? cloudStore.menus
+          : (localMatch ? localMatch.menus : [])
+      };
+    });
+    saveLocalStores(state.stores);
+  }
+
+  const cloudOrders = Array.isArray(payload.orders)
+    ? payload.orders
+    : (Array.isArray(payload.recentOrders) ? payload.recentOrders : null);
+
+  if (cloudOrders) {
+    const mergedMap = new Map();
+    cloudOrders.forEach(o => mergedMap.set(o.orderId, o));
+    state.orders.forEach(localOrd => {
+      if (!mergedMap.has(localOrd.orderId)) {
+        mergedMap.set(localOrd.orderId, localOrd);
+      } else {
+        const cloudOrd = mergedMap.get(localOrd.orderId);
+        if ((Number(localOrd.notifyCount) || 0) > (Number(cloudOrd.notifyCount) || 0)) {
+          cloudOrd.notifyCount = localOrd.notifyCount;
+        }
+        if (localOrd.paymentStatus === '已付款') {
+          cloudOrd.paymentStatus = '已付款';
+        }
+      }
+    });
+    state.orders = Array.from(mergedMap.values());
+    saveCachedOrders(state.orders);
+
+    // 偵測當前學生的訂單是否剛被店家按下「🔔 通知取餐」
+    const watchedId = state.trackingOrderId || state.myCreatedOrderId;
+    if (watchedId && (state.routeMode === 'ticket' || state.routeMode === 'order')) {
+      const myOrd = state.orders.find(o => o.orderId === watchedId);
+      if (myOrd) {
+        const prev = state.lastSeenOrderNotifyMap[myOrd.orderId] || { status: '製作中', notifyCount: 0 };
+        const curCount = Number(myOrd.notifyCount) || 0;
+        const becameReady = (prev.status !== '可取餐' && myOrd.status === '可取餐') ||
+                            (myOrd.status === '可取餐' && curCount > prev.notifyCount);
+        state.lastSeenOrderNotifyMap[myOrd.orderId] = { status: myOrd.status, notifyCount: curCount };
+        if (becameReady) {
+          triggerStudentPickupAlert(myOrd);
+        }
+      }
+    }
+  }
+}
+
 async function syncCloud(showSuccessToast = false) {
   setSyncState('syncing', '同步中...');
   try {
@@ -1021,63 +1096,11 @@ async function syncCloud(showSuccessToast = false) {
     });
     const data = await res.json();
     if (data && data.success) {
-      if (Array.isArray(data.stores) && data.stores.length > 0) {
-        state.stores = data.stores.map(cloudStore => {
-          const localMatch = state.stores.find(s => s.id === cloudStore.id);
-          return {
-            ...cloudStore,
-            cutleryPrice: cloudStore.cutleryPrice !== undefined ? Number(cloudStore.cutleryPrice) : (localMatch && localMatch.cutleryPrice !== undefined ? Number(localMatch.cutleryPrice) : 1),
-            useCustomLineOa: cloudStore.useCustomLineOa !== undefined ? Boolean(cloudStore.useCustomLineOa) : Boolean(localMatch && localMatch.useCustomLineOa),
-            customLineClientId: cloudStore.customLineClientId || (localMatch ? localMatch.customLineClientId : '') || '',
-            customLineClientSecret: cloudStore.customLineClientSecret || (localMatch ? localMatch.customLineClientSecret : '') || '',
-            customLineChannelToken: cloudStore.customLineChannelToken || (localMatch ? localMatch.customLineChannelToken : '') || '',
-            menus: (Array.isArray(cloudStore.menus) && cloudStore.menus.length > 0)
-              ? cloudStore.menus
-              : (localMatch ? localMatch.menus : [])
-          };
-        });
-        saveLocalStores(state.stores);
-      }
-
-      if (Array.isArray(data.recentOrders)) {
-        const mergedMap = new Map();
-        data.recentOrders.forEach(o => mergedMap.set(o.orderId, o));
-        state.orders.forEach(localOrd => {
-          if (!mergedMap.has(localOrd.orderId)) {
-            mergedMap.set(localOrd.orderId, localOrd);
-          } else {
-            const cloudOrd = mergedMap.get(localOrd.orderId);
-            if ((Number(localOrd.notifyCount) || 0) > (Number(cloudOrd.notifyCount) || 0)) {
-              cloudOrd.notifyCount = localOrd.notifyCount;
-            }
-            if (localOrd.paymentStatus === '已付款') {
-              cloudOrd.paymentStatus = '已付款';
-            }
-          }
-        });
-        state.orders = Array.from(mergedMap.values());
-        saveCachedOrders(state.orders);
-
-        // 偵測當前學生的訂單是否剛被店家按下「🔔 通知取餐」
-        const watchedId = state.trackingOrderId || state.myCreatedOrderId;
-        if (watchedId && (state.routeMode === 'ticket' || state.routeMode === 'order')) {
-          const myOrd = state.orders.find(o => o.orderId === watchedId);
-          if (myOrd) {
-            const prev = state.lastSeenOrderNotifyMap[myOrd.orderId] || { status: '製作中', notifyCount: 0 };
-            const curCount = Number(myOrd.notifyCount) || 0;
-            const becameReady = (prev.status !== '可取餐' && myOrd.status === '可取餐') || (myOrd.status === '可取餐' && curCount > prev.notifyCount);
-            state.lastSeenOrderNotifyMap[myOrd.orderId] = { status: myOrd.status, notifyCount: curCount };
-            if (becameReady) {
-              triggerStudentPickupAlert(myOrd);
-            }
-          }
-        }
-      }
-
+      applyCloudBundle(data);
       enrichStoresAndAi();
       if (state.routeMode === 'order') renderStudentOrderExperience();
       if (state.routeMode === 'ticket') renderSingleTicketView();
-      if (state.routeMode === 'store' && state.storeTabMode === 'kds') renderMerchantOrdersOnly();
+      if (state.routeMode === 'store') renderMerchantView();
 
       setSyncState('online', '已同步');
       if (showSuccessToast) showToast('☁️ 已與雲端資料庫完成同步');
@@ -3956,8 +3979,9 @@ function renderMerchantSettingsPanel(store) {
               <label class="field-label">🎁 AI 離峰分流優惠模式</label>
               <select id="cfgPromoMode" class="select-input">
                 <option value="none" ${store.promoMode === 'none' ? 'selected' : ''}>關閉優惠</option>
-                <option value="freebie" ${store.promoMode === 'freebie' ? 'selected' : ''}>贈送招牌小菜 / 飲品</option>
+                <option value="gift" ${(store.promoMode === 'gift' || store.promoMode === 'freebie') ? 'selected' : ''}>贈送招牌小菜 / 飲品</option>
                 <option value="discount" ${store.promoMode === 'discount' ? 'selected' : ''}>現金折抵 (NT$)</option>
+                <option value="points" ${store.promoMode === 'points' ? 'selected' : ''}>雙倍點數回饋</option>
               </select>
             </div>
 
@@ -4014,7 +4038,7 @@ function renderMerchantSettingsPanel(store) {
           ${store.useCustomLineOa ? `
             <div style="background:#FFFFFF; padding:14px; border-radius:12px; border:1px solid #86EFAC; margin-bottom:12px;">
               <div style="font-size:0.86rem; font-weight:900; color:#065F46; margin-bottom:10px;">
-                🏪 「${escapeHtml(store.name)}」專屬官方 LINE 參數設定（正式營運必填）
+                🏪 「${escapeHtml(store.name)}」專屬官方 LINE 參數設定（金鑰將安全加密儲存於後端 GAS Properties）
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
                 <div>
@@ -4023,12 +4047,12 @@ function renderMerchantSettingsPanel(store) {
                 </div>
                 <div>
                   <label class="field-label">LINE Login Channel Secret</label>
-                  <input type="password" id="cfgStoreLineClientSecret" class="select-input" placeholder="輸入店家 LINE Login Channel Secret" value="${escapeHtml(store.customLineClientSecret || '')}">
+                  <input type="password" id="cfgStoreLineClientSecret" class="select-input" placeholder="輸入新 Secret 以更新後端設定（留空則維持原設定）" value="">
                 </div>
               </div>
               <div>
                 <label class="field-label">Messaging API Channel Access Token (Long-lived)</label>
-                <input type="password" id="cfgStoreLineChannelToken" class="select-input" placeholder="貼上本店 Messaging API Channel Access Token" value="${escapeHtml(store.customLineChannelToken || '')}">
+                <input type="password" id="cfgStoreLineChannelToken" class="select-input" placeholder="貼上本店 Messaging API Token（留空則維持原設定）" value="">
               </div>
             </div>
           ` : `
@@ -4037,7 +4061,7 @@ function renderMerchantSettingsPanel(store) {
                 🏆 目前「${escapeHtml(store.name)}」使用【黑客鬆比賽預設官方 LINE (2012260287) + 📧 Email 無限額通知】
               </div>
               <p style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:10px;">
-                系統已內建您的新憑證（Channel ID: <code>2012260287</code>）。若 LINE 免費 200 則額度滿載，或學生有填寫 Email，後端 GAS 會同步透過 <code>MailApp.sendEmail</code> 發送 HTML 取餐通知信（完全無每月則數限制）：
+                為符合資安規範並避免 GitHub 金鑰外洩，Channel Secret 與 Messaging API Token 均安全存放於後端 GAS <code>ScriptProperties</code>。如需更新後端金鑰可於下方填入後按儲存：
               </p>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
                 <div>
@@ -4046,12 +4070,12 @@ function renderMerchantSettingsPanel(store) {
                 </div>
                 <div>
                   <label class="field-label">比賽預設 LINE Login Channel Secret</label>
-                  <input type="password" id="cfgSysLineClientSecret" class="select-input" placeholder="已內建 e78839eba4d3aa7d4ec65633924de226">
+                  <input type="password" id="cfgSysLineClientSecret" class="select-input" placeholder="由後端 GAS ScriptProperties 安全託管（欲更新請輸入）">
                 </div>
               </div>
               <div>
                 <label class="field-label">比賽預設 Messaging API Channel Access Token</label>
-                <input type="password" id="cfgLineAccessToken" class="select-input" placeholder="已內建 rPsZmKQjS70tezeGNsf5+lo1QZvRSCnd...">
+                <input type="password" id="cfgLineAccessToken" class="select-input" placeholder="由後端 GAS ScriptProperties 安全託管（欲更新請輸入）">
               </div>
             </div>
           `}
@@ -4316,12 +4340,14 @@ async function triggerTrafficSimulation() {
     btn.innerText = '⏳ 正在注入尖峰流量...';
   }
 
-  // 本地同步模擬：讓熱門店滿載、離峰店開啟優惠
+  // 本地同步模擬：讓雙溪與城中熱門店 (S01, S03, S05) 滿載、離峰店開啟優惠
   state.stores.forEach(s => {
-    if (s.id === 'S01' || s.id === 'S02' || s.id === 'C01') {
+    if (s.id === 'S01' || s.id === 'S03' || s.id === 'S05') {
       s.activeOrders = Math.round(s.maxCapacityPer15Min * 1.15);
+      s.avgPrepMinutes = calcPrepMinutes(s.activeOrders, s.maxCapacityPer15Min);
     } else {
       s.activeOrders = Math.max(2, Math.round(s.maxCapacityPer15Min * 0.2));
+      s.avgPrepMinutes = calcPrepMinutes(s.activeOrders, s.maxCapacityPer15Min);
       if (s.promoMode === 'none') {
         s.promoMode = 'discount';
         s.promoDiscount = 10;
@@ -4336,12 +4362,18 @@ async function triggerTrafficSimulation() {
   showToast('⚡ 已觸發中午 12:10 尖峰流量模擬！');
 
   try {
-    await fetch(GAS_URL, {
+    const res = await fetch(GAS_URL, {
       method: 'POST',
       mode: 'cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'simulateTraffic', campus: state.campus })
+      body: JSON.stringify({ action: 'simulateTraffic', mode: 'PEAK', campus: state.campus })
     });
+    const data = await res.json();
+    if (data && data.success) {
+      applyCloudBundle(data);
+      enrichStoresAndAi();
+      renderMerchantView();
+    }
   } catch (e) {} finally {
     if (btn) {
       btn.disabled = false;
@@ -4363,23 +4395,27 @@ async function saveLineMessagingConfig() {
   if (!store) return;
 
   if (store.useCustomLineOa) {
-    store.customLineClientId = document.getElementById('cfgStoreLineClientId')?.value.trim() || '';
-    store.customLineClientSecret = document.getElementById('cfgStoreLineClientSecret')?.value.trim() || '';
-    store.customLineChannelToken = document.getElementById('cfgStoreLineChannelToken')?.value.trim() || '';
+    const clientId = document.getElementById('cfgStoreLineClientId')?.value.trim() || '';
+    const clientSecret = document.getElementById('cfgStoreLineClientSecret')?.value.trim() || '';
+    const channelToken = document.getElementById('cfgStoreLineChannelToken')?.value.trim() || '';
+
+    store.customLineClientId = clientId;
+    store.customLineClientSecret = '';
+    store.customLineChannelToken = '';
     saveLocalStores(state.stores);
-    showToast(`✅ 已儲存「${store.name}」專屬官方 LINE 推播設定！`);
+    showToast(`✅ 已儲存「${store.name}」專屬官方 LINE 推播設定至雲端後台！`);
     try {
       await fetch(GAS_URL, {
         method: 'POST',
         mode: 'cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          action: 'updateStoreConfig',
+          action: 'saveLineDevConfig',
           storeId: store.id,
           useCustomLineOa: true,
-          customLineClientId: store.customLineClientId,
-          customLineClientSecret: store.customLineClientSecret,
-          customLineChannelToken: store.customLineChannelToken
+          clientId,
+          clientSecret,
+          channelAccessToken: channelToken
         })
       });
     } catch (e) {}
@@ -4389,10 +4425,8 @@ async function saveLineMessagingConfig() {
     const sysChannelToken = document.getElementById('cfgLineAccessToken')?.value.trim() || '';
 
     state.lineProfile.customClientId = sysClientId;
+    state.lineProfile.channelAccessToken = '';
     try { localStorage.setItem('mealflow_system_line_client_id', sysClientId); } catch (e) {}
-    if (sysChannelToken) {
-      state.lineProfile.channelAccessToken = sysChannelToken;
-    }
     saveLineProfile(state.lineProfile);
     store.useCustomLineOa = false;
     saveLocalStores(state.stores);
@@ -4409,7 +4443,7 @@ async function saveLineMessagingConfig() {
           useCustomLineOa: false,
           systemClientId: sysClientId,
           systemClientSecret: sysClientSecret,
-          channelAccessToken: sysChannelToken
+          systemChannelToken: sysChannelToken
         })
       });
     } catch (e) {}
