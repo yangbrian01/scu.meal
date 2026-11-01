@@ -1300,3 +1300,92 @@ body.store-mode-active .container {
     grid-template-columns: 1fr;
   }
 }
+/* ==================== 初審原型聲明彈窗 (Prototype Notice Modal) ==================== */
+#prototypeNoticeModal {
+  z-index: 9900 !important;
+}
+.proto-modal-card {
+  max-width: 540px;
+  border: 2px solid var(--brand);
+  border-radius: 22px;
+  overflow: hidden;
+}
+.proto-hero-banner {
+  background: linear-gradient(135deg, #1E1B4B 0%, #312E81 55%, #4338CA 100%);
+  color: #FFFFFF;
+  padding: 20px 22px 18px;
+  position: relative;
+}
+.proto-badge-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.proto-tag-pill {
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: rgba(255, 90, 31, 0.95);
+  color: #FFFFFF;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+.proto-team-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.16);
+  color: #E0E7FF;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.proto-stage-box {
+  background: #FFF7ED;
+  border: 1.5px solid #FDBA74;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: #9A3412;
+  line-height: 1.55;
+}
+.proto-roadmap-box {
+  background: #F8FAFC;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.proto-roadmap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.proto-roadmap-item:last-child {
+  margin-bottom: 0;
+}
+.proto-status-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.proto-status-tag.wip {
+  background: #EEF2FF;
+  color: #4338CA;
+  border: 1px solid #C7D2FE;
+}
+.proto-status-tag.testing {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
