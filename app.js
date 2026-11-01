@@ -1013,6 +1013,7 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   });
   applyRouteView();
+  initPrototypeNoticeModal(); // 👈 新增這行：進入網頁時自動建立並彈出初審原型說明視窗
   checkLineOAuthCallbackOnLoad();
   syncCloud(false);
 });
@@ -4448,4 +4449,116 @@ async function saveLineMessagingConfig() {
       });
     } catch (e) {}
   }
+}
+// ==================== 初審原型階段聲明與開發藍圖彈窗 (Prototype Notice Modal) ====================
+function initPrototypeNoticeModal() {
+  // 1. 在頂部導覽列加入「🚧 初審原型說明」按鈕，方便評審隨時重開檢視
+  const brandGroup = document.querySelector('.brand-title-group');
+  if (brandGroup && !document.getElementById('headerProtoNoticeBtn')) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'headerProtoNoticeBtn';
+    btn.className = 'filter-chip';
+    btn.style.cssText = 'padding:3px 10px; font-size:0.72rem; font-weight:800; background:#FFF7ED; color:#C2410C; border-color:#FDBA74;';
+    btn.innerHTML = '🚧 初審原型說明';
+    btn.onclick = () => openPrototypeNoticeModal();
+    brandGroup.appendChild(btn);
+  }
+
+  // 2. 動態注入彈窗 DOM（免手動修改 3 個 index.html）
+  if (!document.getElementById('prototypeNoticeModal')) {
+    const storeUrl = getStorePageUrl();
+    const orderUrl = getOrderPageUrl();
+    const modalHtml = `
+      <div id="prototypeNoticeModal" class="modal-overlay" onclick="if(event.target===this) closePrototypeNoticeModal()">
+        <div class="modal-card proto-modal-card">
+          <div class="proto-hero-banner">
+            <div class="proto-badge-row">
+              <span class="proto-tag-pill">🚧 初審概念驗證原型 (PoC v0.1)</span>
+              <span class="proto-team-pill">提案團隊：可洛貝他索</span>
+            </div>
+            <h3 style="font-size:1.18rem; font-weight:900; line-height:1.35; margin-bottom:4px;">
+              東吳大學 2026 第四屆黑客松｜初審原型體驗說明
+            </h3>
+            <p style="font-size:0.78rem; color:#E0E7FF; opacity:0.95;">
+              感謝評審委員撥冗體驗「MealFlow 學餐 AI 流量管制塔」初審線上原型！
+            </p>
+          </div>
+
+          <div class="modal-body" style="padding:16px 20px;">
+            <div class="proto-stage-box">
+              <strong>⚠️ 版本階段重要提醒（非最終正式產品）：</strong><br>
+              本網站目前僅為<strong>初審書面階段之「最初期介面與流程原型」</strong>，旨在初步展示「尖峰壅塞偵測 ➔ AI 離峰優惠引流 ➔ 線上點餐與櫃檯 POS」之核心概念。<strong>目前畫面與模擬數據不等於最終產品</strong>，多項進階 AI 引擎與硬體串接正由團隊全力開發中！
+            </div>
+
+            <div class="proto-roadmap-box">
+              <div style="font-size:0.82rem; font-weight:900; color:var(--text-primary); margin-bottom:8px;">
+                🚀 決賽階段正在開發與升級中之進階功能：
+              </div>
+
+              <div class="proto-roadmap-item">
+                <span class="proto-status-tag wip">開發中</span>
+                <div>
+                  <strong>AI 備餐需求預測引擎：</strong>自動介接<strong>中央氣象署天氣 API</strong> 與<strong>東吳校園行事曆</strong>（如期中考週、大型活動），結合歷史銷量預測隔日各品項備料量。
+                </div>
+              </div>
+
+              <div class="proto-roadmap-item">
+                <span class="proto-status-tag wip">開發中</span>
+                <div>
+                  <strong>Firebase 即時資料流與 M/M/1 自動校準：</strong>升級全雙工即時狀態同步，並根據店家每日真實出單耗時自動訓練校準佇列參數（解決冷啟動問題）。
+                </div>
+              </div>
+
+              <div class="proto-roadmap-item">
+                <span class="proto-status-tag wip">開發中</span>
+                <div>
+                  <strong>Gemini 2.5 Flash 深度整合與零摩擦語音出單：</strong>優化高說服力動態分流推播文案生成、實拍紙本菜單自動建檔，以及廚房免觸控語音播報出單。
+                </div>
+              </div>
+
+              <div class="proto-roadmap-item">
+                <span class="proto-status-tag testing">實測籌備</span>
+                <div>
+                  <strong>校園封閉實測驗證（2 家學餐 × 50 位同學）：</strong>將於決賽前完成為期一週之實地封閉測試，實證「分流轉換率 30%+」與「尖峰等候縮減 20%」三大指標。
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:10px; padding:10px 12px; font-size:0.78rem; color:#1E40AF; line-height:1.45;">
+              💡 <strong>評審快速體驗建議：</strong>您可直接關閉此視窗試用<strong>學生端分流點餐與 AI 選餐顧問</strong>，或點擊下方按鈕切換體驗<strong>店家端平板 POS 與語音讀單後台</strong>。
+            </div>
+          </div>
+
+          <div class="modal-footer" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="${escapeHtml(storeUrl)}" class="btn-outline" style="flex:1; text-align:center; text-decoration:none; padding:11px 10px; font-size:0.82rem;">
+              🖥️ 查看店家 POS 後台
+            </a>
+            <button type="button" class="btn-tip-action" style="flex:1.4; padding:11px 14px; font-size:0.88rem;" onclick="closePrototypeNoticeModal()">
+              👌 我了解此為初審原型，開始體驗 ➔
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  }
+
+  // 3. 每次開啟新的瀏覽器工作階段 (Session) 時自動彈出一次
+  if (!sessionStorage.getItem('mealflow_proto_notice_ack_v1')) {
+    openPrototypeNoticeModal();
+  }
+}
+
+function openPrototypeNoticeModal() {
+  const modal = document.getElementById('prototypeNoticeModal');
+  if (modal) modal.classList.add('open');
+}
+
+function closePrototypeNoticeModal() {
+  const modal = document.getElementById('prototypeNoticeModal');
+  if (modal) modal.classList.remove('open');
+  try {
+    sessionStorage.setItem('mealflow_proto_notice_ack_v1', '1');
+  } catch (e) {}
 }
